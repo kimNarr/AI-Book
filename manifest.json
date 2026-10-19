@@ -1,0 +1,17 @@
+{
+  "name": "AI-Book: Learning Log",
+  "short_name": "AI-Book",
+  "description": "공부의 순서만 바뀐 것이다. 안 해도 되는 건 아니다 — AI 개념·용어·기술·엔지니어링 역추적 기록장",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#e6e2d8",
+  "theme_color": "#2c3e50",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "assets/covers/cover-1.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
