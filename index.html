@@ -5,637 +5,623 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI-Book — AI-Book: Learning Log</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#2c3e50">
+  <meta name="theme-color" content="#1e242b">
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="src/styles/ebook.css">
 </head>
-<body class="min-h-screen flex flex-col selection:bg-stone-800 selection:text-stone-100">
+<body class="min-h-screen flex flex-col lg:flex-row selection:bg-stone-800 selection:text-stone-100">
 
   <!-- ===================================================================== -->
-  <!-- TOP EDITORIAL HEADER & NAVIGATION BAR                                 -->
+  <!-- MOBILE TOP BAR (<1024px ONLY)                                         -->
   <!-- ===================================================================== -->
-  <header class="sticky top-0 z-30 bg-[#f4f1ea]/95 backdrop-blur border-b border-[#d6cfc2] px-3 sm:px-6 lg:px-8 py-2.5">
-    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2.5">
-      <!-- Book Title & Subtitle -->
+  <div class="lg:hidden sticky top-0 z-40 bg-[#1e242b] text-stone-100 px-4 py-3 flex items-center justify-between border-b border-stone-700">
+    <div class="flex items-center gap-2.5">
+      <button type="button" id="btnMobileOpenSidebar" class="px-2.5 py-1 rounded bg-stone-700 text-xs font-semibold text-stone-100">
+        목차 · 메뉴
+      </button>
+      <div>
+        <span class="font-serif-book font-bold text-base">AI-Book</span>
+        <span class="text-xs font-mono-code text-amber-300/90 ml-1.5">Learning Log</span>
+      </div>
+    </div>
+    <button type="button" id="btnMobileQuickAdd" class="px-2.5 py-1 rounded bg-[#7c5e3c] text-xs font-semibold text-stone-100">
+      + 단원 추가
+    </button>
+  </div>
+
+  <!-- Mobile Sidebar Backdrop -->
+  <div id="sidebarBackdrop" class="fixed inset-0 z-40 hidden bg-black/60 lg:hidden"></div>
+
+  <!-- ===================================================================== -->
+  <!-- LEFT FIXED BOOK SIDEBAR (목차 · 검색 · 부록 · 도구 내비게이션)          -->
+  <!-- ===================================================================== -->
+  <aside id="bookSidebar" class="fixed lg:sticky top-0 left-0 z-50 h-screen w-80 xl:w-[340px] shrink-0 bg-[#1e242b] text-stone-200 border-r border-[#323b46] flex flex-col justify-between transition-transform duration-300 -translate-x-full lg:translate-x-0">
+
+    <!-- 1. Sidebar Brand & Search -->
+    <div class="p-5 border-b border-[#323b46] space-y-3.5">
+      <div class="flex items-start justify-between gap-2">
+        <button type="button" id="btnBrandGoCover" class="text-left group">
+          <div class="text-[11px] font-mono-code font-semibold tracking-widest uppercase text-amber-400/90">LIVING KNOWLEDGE BOOK</div>
+          <div class="flex items-baseline gap-2 mt-0.5">
+            <h1 class="text-xl font-serif-book font-bold text-white group-hover:text-amber-200 transition">AI-Book</h1>
+            <span class="text-xs font-mono-code text-stone-400">Learning Log</span>
+          </div>
+        </button>
+        <button type="button" id="btnCloseMobileSidebar" class="lg:hidden text-stone-400 hover:text-white text-sm font-mono-code px-2 py-1">X</button>
+      </div>
+
+      <!-- Global Search inside Sidebar -->
+      <div class="relative">
+        <input id="globalSearchInput" type="text" placeholder="개념, 온톨로지, 강화학습, 용어 검색..." class="w-full bg-[#14181d] border border-[#38424e] focus:border-amber-400/80 rounded-lg pl-3 pr-8 py-2 text-xs text-stone-100 placeholder-stone-400 focus:outline-none">
+        <button id="btnClearSearch" type="button" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-white text-xs font-mono-code">X</button>
+      </div>
+
+      <!-- Reading Progress Bar -->
+      <div class="bg-[#14181d] border border-[#2d3640] rounded-lg px-3 py-2 space-y-1.5">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-stone-400 font-medium">독서 및 학습 진도</span>
+          <span id="progressText" class="font-mono-code text-[11px] font-semibold text-amber-300">0%</span>
+        </div>
+        <div class="w-full h-1.5 bg-stone-700 rounded-full overflow-hidden">
+          <div id="progressBar" class="h-full bg-amber-400 transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Scrollable Book Table of Contents & Appendix Views -->
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-5">
+
+      <!-- Opening & Reader Main Views -->
+      <div class="space-y-1">
+        <div class="px-2 text-[11px] font-mono-code font-bold uppercase tracking-wider text-stone-400 mb-1.5">서문 및 전체 차례</div>
+        <button type="button" data-view="toc" class="nav-tab w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition bg-[#2c3e50] text-white flex items-center justify-between">
+          <span>00. 표지 · 인사말 · 프로젝트 소개</span>
+          <span class="text-[11px] font-mono-code opacity-80">i</span>
+        </button>
+      </div>
+
+      <!-- Expandable 6-Part Chapter & Unit Tree -->
+      <div class="space-y-2">
+        <div class="px-2 flex items-center justify-between">
+          <span class="text-[11px] font-mono-code font-bold uppercase tracking-wider text-stone-400">본문 6부작 목차 (클릭 시 이동)</span>
+          <span id="sidebarTotalUnitsBadge" class="text-[11px] font-mono-code text-stone-400">24단원</span>
+        </div>
+        <div id="sidebarChapterTree" class="space-y-2.5">
+          <!-- Populated dynamically by JS with all 6 Parts and their 24 sections -->
+        </div>
+      </div>
+
+      <!-- Appendix / Curated Reference Sections -->
+      <div class="space-y-1 pt-3 border-t border-[#323b46]">
+        <div class="px-2 text-[11px] font-mono-code font-bold uppercase tracking-wider text-stone-400 mb-1.5">부록 · 직군별 로드맵 및 색인</div>
+        <button type="button" data-view="roles" class="nav-tab w-full text-left px-3 py-2 rounded-lg text-xs sm:text-sm font-medium text-stone-300 hover:bg-[#2a323c] transition">
+          부록 A · 6대 직군별 맞춤 로드맵
+        </button>
+        <button type="button" data-view="architecture" class="nav-tab w-full text-left px-3 py-2 rounded-lg text-xs sm:text-sm font-medium text-stone-300 hover:bg-[#2a323c] transition">
+          부록 B · AI 엔지니어링 5계층 도해
+        </button>
+        <button type="button" data-view="tools" class="nav-tab w-full text-left px-3 py-2 rounded-lg text-xs sm:text-sm font-medium text-stone-300 hover:bg-[#2a323c] transition">
+          부록 C · 실전 오픈소스 · 모델 색인
+        </button>
+        <button type="button" data-view="playbook" class="nav-tab w-full text-left px-3 py-2 rounded-lg text-xs sm:text-sm font-medium text-stone-300 hover:bg-[#2a323c] transition">
+          부록 D · 상황별 아키텍처 조합 레시피
+        </button>
+        <button type="button" data-view="indexgrid" class="nav-tab w-full text-left px-3 py-2 rounded-lg text-xs sm:text-sm font-medium text-stone-300 hover:bg-[#2a323c] transition">
+          부록 E · 전체 개념 · 용어 사전
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. Sidebar Bottom Action Buttons -->
+    <div class="p-4 border-t border-[#323b46] bg-[#181d23] space-y-2">
+      <button id="btnOpenAddModal" type="button" class="w-full py-2 px-3 rounded-lg bg-[#7c5e3c] hover:bg-[#684e30] text-white text-xs sm:text-sm font-semibold transition">
+        + 목차 순서에 새 단원 끼워넣기
+      </button>
+      <button id="btnOpenExportModal" type="button" class="w-full py-1.5 px-3 rounded-lg bg-[#262e38] hover:bg-[#323c48] text-stone-200 border border-[#3b4654] text-xs font-medium transition">
+        Git 코드 · 마크다운 원고 내보내기
+      </button>
+    </div>
+  </aside>
+
+  <!-- ===================================================================== -->
+  <!-- RIGHT MAIN BOOK CANVAS (화면 나머지 전체 100%를 채우는 서적 지면)       -->
+  <!-- ===================================================================== -->
+  <main class="flex-1 min-w-0 book-page-sheet flex flex-col justify-between">
+
+    <!-- Desktop Sidebar Fold/Unfold Floating Button -->
+    <div class="hidden lg:flex items-center justify-between px-8 xl:px-14 pt-5 pb-2 border-b border-[#e5dfd3] bg-[#f6f3ec]/70">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded bg-[#2c3e50] text-[#faf8f3] flex items-center justify-center font-serif-book font-bold text-xs tracking-wider shrink-0 border border-stone-600">
-          AI
-        </div>
-        <div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <h1 class="text-base sm:text-lg font-serif-book font-bold text-stone-900 tracking-tight">AI-Book</h1>
-            <span class="text-xs font-mono-code font-semibold px-2 py-0.5 rounded bg-[#ebe6dc] text-[#7c5e3c] border border-[#ccc4b4]">AI-Book: Learning Log</span>
-          </div>
-          <p class="text-[11px] text-stone-600 hidden sm:block">공부의 순서만 바뀐 것이다. 안 해도 되는 건 아니다 — 개념·용어·기술 역추적 기록장</p>
-        </div>
+        <button type="button" id="btnToggleDesktopSidebar" class="px-2.5 py-1 rounded text-xs font-medium bg-[#ebe6dc] hover:bg-[#dfd9cc] text-stone-700 border border-[#ccc4b4] transition">
+          좌측 목차 접기 / 펼치기
+        </button>
+        <span class="text-xs font-serif-book text-stone-500">AI-Book: Learning Log — "공부의 순서만 바뀐 것이다. 안 해도 되는 건 아니다."</span>
       </div>
-
-      <!-- Reading Progress & Utility Buttons -->
-      <div class="flex items-center gap-2">
-        <div class="hidden md:flex items-center gap-2.5 bg-[#ebe6dc] border border-[#d6cfc2] rounded px-3 py-1">
-          <span class="text-[11px] font-medium text-stone-600">학습 진도</span>
-          <div class="w-20 h-1.5 bg-stone-300 rounded-full overflow-hidden">
-            <div id="progressBar" class="h-full bg-[#2c3e50] transition-all duration-300" style="width: 0%"></div>
-          </div>
-          <span id="progressText" class="text-[11px] font-semibold text-stone-800">0%</span>
-        </div>
-
-        <button id="btnOpenAddModal" type="button" class="text-xs font-semibold px-3 py-1.5 rounded bg-[#2c3e50] hover:bg-[#1e2b38] text-stone-100 transition">
-          + 목차에 새 단원 끼워넣기
-        </button>
-        <button id="btnOpenExportModal" type="button" class="text-xs font-medium px-3 py-1.5 rounded bg-[#ebe6dc] hover:bg-[#dfd9cc] text-stone-800 border border-[#ccc4b4] transition">
-          Git 코드 · 원고 내보내기
-        </button>
+      <div class="flex items-center gap-2 text-xs text-stone-600">
+        <span id="topQuickStatus" class="font-mono-code">전 6부 24단원</span>
       </div>
     </div>
 
-    <!-- Book Section Navigation & Global Search -->
-    <div class="max-w-7xl mx-auto mt-2 pt-2 border-t border-[#e2ddd3] flex flex-wrap items-center justify-between gap-2">
-      <nav class="flex items-center gap-1 overflow-x-auto custom-scrollbar pb-0.5" aria-label="Book Views">
-        <button type="button" data-view="toc" class="nav-tab px-3 py-1 rounded text-xs font-semibold transition bg-[#2c3e50] text-stone-100 whitespace-nowrap">
-          첫 표지 · 서문 · 목차
-        </button>
-        <button type="button" data-view="ebook" class="nav-tab px-3 py-1 rounded text-xs font-medium transition text-stone-600 hover:bg-stone-200/70 whitespace-nowrap">
-          본문 · 그림 도해 · 실습
-        </button>
-        <button type="button" data-view="roles" class="nav-tab px-3 py-1 rounded text-xs font-medium transition text-stone-600 hover:bg-stone-200/70 whitespace-nowrap">
-          직군별 맞춤 로드맵
-        </button>
-        <button type="button" data-view="architecture" class="nav-tab px-3 py-1 rounded text-xs font-medium transition text-stone-600 hover:bg-stone-200/70 whitespace-nowrap">
-          5계층 아키텍처 도해
-        </button>
-        <button type="button" data-view="tools" class="nav-tab px-3 py-1 rounded text-xs font-medium transition text-stone-600 hover:bg-stone-200/70 whitespace-nowrap">
-          실전 도구 색인
-        </button>
-        <button type="button" data-view="playbook" class="nav-tab px-3 py-1 rounded text-xs font-medium transition text-stone-600 hover:bg-stone-200/70 whitespace-nowrap">
-          조합 레시피
-        </button>
-        <button type="button" data-view="indexgrid" class="nav-tab px-3 py-1 rounded text-xs font-medium transition text-stone-600 hover:bg-stone-200/70 whitespace-nowrap">
-          전체 개념 · 용어 색인
-        </button>
-      </nav>
-
-      <!-- Search Input -->
-      <div class="relative w-full sm:w-64">
-        <input id="globalSearchInput" type="text" placeholder="온톨로지, 강화학습, 용어·도구 검색..." class="w-full bg-[#faf8f3] border border-[#ccc4b4] focus:border-[#2c3e50] rounded pl-2.5 pr-7 py-1 text-xs text-stone-800 placeholder-stone-400 focus:outline-none">
-        <button id="btnClearSearch" type="button" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-mono-code">X</button>
-      </div>
-    </div>
-  </header>
-
-  <!-- ===================================================================== -->
-  <!-- MAIN DESK WORKSPACE                                                   -->
-  <!-- ===================================================================== -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 flex flex-col justify-between">
-
     <!-- =================================================================== -->
-    <!-- VIEW 0: COVER, FIRST PAGE (PROLOGUE/INTRO) & TABLE OF CONTENTS      -->
+    <!-- VIEW 0: FIRST COVER, PROLOGUE (인사말·소개) & MASTER TOC             -->
     <!-- =================================================================== -->
-    <section id="view-toc" class="space-y-4">
-      <div class="book-shell rounded-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[740px]">
+    <section id="view-toc" class="w-full max-w-6xl mx-auto px-5 sm:px-10 xl:px-16 py-8 sm:py-12 space-y-12">
 
-        <!-- LEFT PAGE: FIRST COVER (첫 표지 — AI-Book / AI-Book: Learning Log) -->
-        <div class="lg:col-span-5 p-6 sm:p-8 bg-[#f3efe6] border-b lg:border-b-0 lg:border-r border-[#dcd6c8] flex flex-col justify-between">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] font-semibold uppercase tracking-widest text-stone-500">첫 표지 디자인 선택</span>
-              <span id="coverStyleLabel" class="text-[11px] font-medium text-[#7c5e3c]">시안 1 · 리넨 지오메트릭</span>
-            </div>
-            <div class="grid grid-cols-3 gap-1.5">
-              <button type="button" data-cover="0" class="cover-select-btn px-2.5 py-1.5 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 border border-[#2c3e50] transition">
-                시안 1 (리넨)
-              </button>
-              <button type="button" data-cover="1" class="cover-select-btn px-2.5 py-1.5 rounded text-xs font-medium bg-[#faf8f3] text-stone-700 border border-[#ccc4b4] hover:bg-stone-200/60 transition">
-                시안 2 (클래식 판화)
-              </button>
-              <button type="button" data-cover="2" class="cover-select-btn px-2.5 py-1.5 rounded text-xs font-medium bg-[#faf8f3] text-stone-700 border border-[#ccc4b4] hover:bg-stone-200/60 transition">
-                시안 3 (블루프린트)
-              </button>
-            </div>
+      <!-- 1. 첫 표지 & 여는 글 (인사말) 상단 그리드 -->
+      <div class="grid grid-cols-1 xl:grid-cols-12 gap-8 lg:gap-10 items-start">
+
+        <!-- 좌측: 하드커버 첫 표지 프레임 -->
+        <div class="xl:col-span-5 bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-6 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-widest text-stone-500">첫 표지 디자인</span>
+            <span id="coverStyleLabel" class="text-xs font-medium text-[#7c5e3c]">시안 1 · 리넨 지오메트릭</span>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button type="button" data-cover="0" class="cover-select-btn px-2.5 py-1.5 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 border border-[#2c3e50] transition">
+              시안 1 (리넨)
+            </button>
+            <button type="button" data-cover="1" class="cover-select-btn px-2.5 py-1.5 rounded text-xs font-medium bg-[#faf8f3] text-stone-700 border border-[#ccc4b4] hover:bg-stone-200/60 transition">
+              시안 2 (판화)
+            </button>
+            <button type="button" data-cover="2" class="cover-select-btn px-2.5 py-1.5 rounded text-xs font-medium bg-[#faf8f3] text-stone-700 border border-[#ccc4b4] hover:bg-stone-200/60 transition">
+              시안 3 (도면)
+            </button>
           </div>
 
-          <!-- Hardcover Book Frame (첫 표지) -->
-          <div class="my-4 mx-auto w-full max-w-[345px] rounded-lg overflow-hidden border border-stone-400/90 shadow-xl bg-[#faf8f3] flex flex-col">
-            <div class="px-5 pt-5 pb-3.5 border-b border-stone-300/80 bg-[#f7f4ec]">
-              <div class="flex items-center justify-between text-[10px] font-mono-code font-semibold tracking-[0.16em] uppercase text-[#7c5e3c]">
+          <!-- Hardcover Book Frame -->
+          <div class="mx-auto w-full max-w-[360px] rounded-xl overflow-hidden border border-stone-400/90 shadow-xl bg-[#faf8f3] flex flex-col">
+            <div class="px-6 pt-5 pb-4 border-b border-stone-300/80 bg-[#f7f4ec]">
+              <div class="flex items-center justify-between text-[11px] font-mono-code font-semibold tracking-[0.15em] uppercase text-[#7c5e3c]">
                 <span>CONCEPT &amp; ENGINEERING ARCHIVE</span>
                 <span>VOL. 01</span>
               </div>
-              <h2 class="text-2xl font-serif-book font-bold text-stone-900 mt-1 tracking-tight">AI-Book</h2>
-              <p class="text-xs font-mono-code font-semibold text-[#2c3e50] mt-0.5">AI-Book: Learning Log</p>
-              <p class="text-[11px] text-stone-600 mt-1.5 leading-relaxed">
+              <h2 class="text-3xl font-serif-book font-bold text-stone-900 mt-1.5 tracking-tight">AI-Book</h2>
+              <p class="text-sm font-mono-code font-semibold text-[#2c3e50] mt-0.5">AI-Book: Learning Log</p>
+              <p class="text-xs text-stone-600 mt-2 leading-relaxed">
                 개념 접근 · 필수 용어 · 기초에서 심화 엔지니어링 및 직군별 로드맵까지 기록하고 공유하는 살아있는 E-Book
               </p>
             </div>
 
-            <div class="relative aspect-[4/4.3] w-full bg-stone-200 overflow-hidden">
+            <div class="relative aspect-[4/4.2] w-full bg-stone-200 overflow-hidden">
               <img id="coverMainImg" src="assets/covers/cover-1.jpg" alt="AI-Book: Learning Log Cover" class="w-full h-full object-cover">
-              <!-- Editorial Belly-Band (표지 띠지 소개글) -->
-              <div class="absolute inset-x-0 bottom-0 bg-[#1c1917]/90 backdrop-blur-sm text-[#faf8f3] px-5 py-3.5 border-t border-[#7c5e3c]">
-                <div class="text-[10px] font-mono-code uppercase tracking-widest text-amber-300/90">PROLOGUE EPIGRAPH</div>
-                <p class="text-xs sm:text-sm font-serif-book font-bold leading-snug mt-0.5 text-stone-100">
+              <div class="absolute inset-x-0 bottom-0 bg-[#1c1917]/92 backdrop-blur-sm text-[#faf8f3] px-5 py-4 border-t-2 border-[#7c5e3c]">
+                <div class="text-[11px] font-mono-code uppercase tracking-widest text-amber-300">PROLOGUE EPIGRAPH</div>
+                <p class="text-sm sm:text-base font-serif-book font-bold leading-snug mt-1 text-white">
                   "공부의 순서만 바뀐 것이다. 안 해도 되는 건 아니다."
                 </p>
-                <p class="text-[11px] text-stone-300 mt-1 leading-relaxed">
+                <p class="text-xs text-stone-300 mt-1.5 leading-relaxed">
                   원하는 것만 입력하면 결과물이 나오는 시대, "내가 진정 알고 일하고 있나"라는 질문에서 시작한 역방향 AI 학습 기록장
                 </p>
               </div>
             </div>
 
-            <div class="px-5 py-2.5 bg-[#f7f4ec] border-t border-stone-300/80 flex items-center justify-between text-[11px] text-stone-600">
+            <div class="px-6 py-3 bg-[#f7f4ec] border-t border-stone-300/80 flex items-center justify-between text-xs text-stone-600">
               <span class="font-serif-book font-semibold">AI-Book: Learning Log</span>
               <span id="coverTotalStats" class="font-mono-code">전 6부 24단원 수록</span>
             </div>
           </div>
 
-          <!-- Start Reading CTA -->
-          <div class="pt-3 border-t border-[#dcd6c8] flex flex-wrap items-center justify-between gap-2">
-            <div class="flex items-center gap-1.5">
-              <button type="button" data-fronttab="all" class="front-page-tab-btn px-2.5 py-1.5 rounded text-xs font-semibold bg-[#ebe6dc] text-stone-800 border border-[#ccc4b4] hover:bg-stone-300 transition">
-                첫 페이지 · 서문 보기
-              </button>
-              <button type="button" data-fronttab="toc" class="front-page-tab-btn px-2.5 py-1.5 rounded text-xs font-medium bg-[#faf8f3] text-stone-700 border border-[#ccc4b4] hover:bg-stone-200 transition">
-                목차만 보기
-              </button>
-            </div>
-            <button type="button" id="btnStartFirstPage" class="px-4 py-2 rounded bg-[#2c3e50] hover:bg-[#1e2b38] text-stone-100 text-xs font-semibold transition">
-              본문 p.01 펼치기 →
-            </button>
-          </div>
+          <button type="button" id="btnStartFirstPage" class="w-full py-3 rounded-lg bg-[#2c3e50] hover:bg-[#1e2b38] text-white text-sm font-semibold transition shadow-sm">
+            제1장 본문 첫 페이지 펼치기 (p.01) →
+          </button>
         </div>
 
-        <!-- RIGHT PAGE: FIRST PAGE (PROLOGUE & PROJECT INTRO) + SMART TABLE OF CONTENTS -->
-        <div class="lg:col-span-7 p-6 sm:p-9 bg-[#faf8f3] book-spine-divider flex flex-col justify-between">
-          <div class="space-y-6">
-
-            <!-- Right Page Top Mode Switcher (첫 페이지 서문·소개 / 마스터 목차) -->
-            <div class="border-b-2 border-stone-800 pb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span class="text-[11px] font-mono-code font-semibold tracking-[0.18em] uppercase text-[#7c5e3c]">OPENING PAGE &amp; CURRICULUM</span>
-                <h2 class="text-xl sm:text-2xl font-serif-book font-bold text-stone-900 mt-0.5">AI-Book: Learning Log</h2>
-              </div>
-              <div class="flex items-center gap-1 bg-[#ebe6dc] p-1 rounded border border-[#d0c9b8]">
-                <button type="button" data-frontmode="all" class="front-mode-btn px-2.5 py-1 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 transition">
-                  서문 + 목차 통합
-                </button>
-                <button type="button" data-frontmode="prologue" class="front-mode-btn px-2.5 py-1 rounded text-xs font-medium text-stone-700 hover:bg-stone-300/60 transition">
-                  첫 페이지 (인사말·소개)
-                </button>
-                <button type="button" data-frontmode="toc" class="front-mode-btn px-2.5 py-1 rounded text-xs font-medium text-stone-700 hover:bg-stone-300/60 transition">
-                  6부작 마스터 목차
-                </button>
-              </div>
-            </div>
-
-            <!-- ============================================================= -->
-            <!-- SECTION A: 첫 페이지 (인사말 · 역방향 학습 도해 · 프로젝트 소개) -->
-            <!-- ============================================================= -->
-            <div id="frontPrologueSection" class="space-y-5">
-
-              <!-- 1. 인사말 (Author's Prologue) -->
-              <article class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-5 sm:p-6 space-y-3.5 relative">
-                <div class="flex items-center justify-between border-b border-[#dfd9cc] pb-2.5">
-                  <div class="flex items-center gap-2">
-                    <span class="text-[11px] font-mono-code font-bold px-2 py-0.5 rounded bg-[#2c3e50] text-stone-100">PROLOGUE</span>
-                    <h3 class="text-sm sm:text-base font-serif-book font-bold text-stone-900">인사말 — 여는 글</h3>
-                  </div>
-                  <span class="text-[11px] font-serif-book text-stone-500">Page i · 첫 페이지</span>
-                </div>
-
-                <div class="editorial-prose text-xs sm:text-sm font-serif-book space-y-3 text-stone-800">
-                  <p>
-                    비전공자인 내가 IT업계에서 일하고 있지만 요즘 AI 사용 빈도가 높아짐에 따라 일을 쳐내는 데에는 별 무리가 없었지만 항상 <strong class="text-stone-950 underline decoration-[#7c5e3c] decoration-2 underline-offset-4">"내가 진정 알고 일을 하고 있나"</strong>라는 질문이 머릿속을 떠나지 않았다.
-                  </p>
-                  <p>
-                    그리고 대 AI 시대에 이전에는 공부를 하지 않으면 일을 할 수 없었지만 요즘은 바로 실무 투입해서 내가 원하는 것만 잘 입력하면 그럴듯한 결과물이 나오는 시대가 되어버린 지금, 오히려 뒤를 돌아볼 때가 아닌가 하는 생각으로 이 프로젝트를 시작한다.
-                  </p>
-                </div>
-
-                <blockquote class="border-l-4 border-[#2c3e50] bg-[#faf8f3] px-4 py-3 rounded-r-lg">
-                  <p class="text-sm sm:text-base font-serif-book font-bold text-[#2c3e50] tracking-tight">
-                    "공부의 순서만 바뀐 것이다. 안 해도 되는 건 아니다."
-                  </p>
-                </blockquote>
-              </article>
-
-              <!-- 2. 그림 설명 & 애니메이션 도해: 공부의 순서가 바뀐 시대 (Reverse-Order Learning) -->
-              <div class="bg-[#faf8f3] border border-[#d6cfc2] rounded-xl p-4 sm:p-5 space-y-3">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <span class="text-[10px] font-mono-code font-bold uppercase tracking-wider text-[#7c5e3c]">FIG 0.1 · ANIMATED PARADIGM DIAGRAM</span>
-                    <h4 class="text-xs sm:text-sm font-serif-book font-bold text-stone-900">그림 설명: 과거의 정방향 학습 vs AI 시대의 역방향 학습 (AI-Book: Learning Log)</h4>
-                  </div>
-                  <span class="text-[11px] font-mono-code text-stone-500">실선: 실무 진행 / 점선 애니메이션: 원리 역추적</span>
-                </div>
-
-                <!-- Animated SVG Diagram for Reverse Learning -->
-                <div class="w-full overflow-x-auto bg-[#f3efe6] border border-[#dcd6c8] rounded-lg p-3">
-                  <svg viewBox="0 0 680 198" class="w-full h-auto min-w-[520px]" role="img" aria-label="공부의 순서 변화 비교 다이어그램">
-                    <defs>
-                      <marker id="arrowMuted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#78716c"/>
-                      </marker>
-                      <marker id="arrowNavy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#2c3e50"/>
-                      </marker>
-                      <marker id="arrowBronze" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#7c5e3c"/>
-                      </marker>
-                    </defs>
-
-                    <!-- Row 1: Pre-AI Era (과거의 학습 순서) -->
-                    <text x="14" y="24" font-size="11" font-weight="700" fill="#78716c" font-family="Noto Sans KR, sans-serif">과거 (Pre-AI 시대) : 공부를 먼저 끝내야만 실무 시작 가능</text>
-                    <rect x="14" y="34" width="175" height="40" rx="6" fill="#ebe6dc" stroke="#bfb8a8" stroke-width="1.2"/>
-                    <text x="101" y="51" text-anchor="middle" font-size="11" font-weight="700" fill="#44403c">01. 기초 이론 · 수학 학습</text>
-                    <text x="101" y="66" text-anchor="middle" font-size="9.5" fill="#78716c">개념 암기 선행</text>
-
-                    <line x1="189" y1="54" x2="243" y2="54" stroke="#78716c" stroke-width="1.5" marker-end="url(#arrowMuted)"/>
-
-                    <rect x="248" y="34" width="175" height="40" rx="6" fill="#ebe6dc" stroke="#bfb8a8" stroke-width="1.2"/>
-                    <text x="335" y="51" text-anchor="middle" font-size="11" font-weight="700" fill="#44403c">02. 기술 습득 · 코드 구현</text>
-                    <text x="335" y="66" text-anchor="middle" font-size="9.5" fill="#78716c">수동 엔지니어링</text>
-
-                    <line x1="423" y1="54" x2="477" y2="54" stroke="#78716c" stroke-width="1.5" marker-end="url(#arrowMuted)"/>
-
-                    <rect x="482" y="34" width="184" height="40" rx="6" fill="#ebe6dc" stroke="#bfb8a8" stroke-width="1.2"/>
-                    <text x="574" y="51" text-anchor="middle" font-size="11" font-weight="700" fill="#44403c">03. 실무 투입 · 결과물 도출</text>
-                    <text x="574" y="66" text-anchor="middle" font-size="9.5" fill="#78716c">최종 산출물 완성</text>
-
-                    <!-- Divider -->
-                    <line x1="14" y1="88" x2="666" y2="88" stroke="#dcd6c8" stroke-dasharray="3 3" stroke-width="1"/>
-
-                    <!-- Row 2: AI Era (AI-Book: Learning Log 역방향 학습) -->
-                    <text x="14" y="108" font-size="11" font-weight="700" fill="#2c3e50" font-family="Noto Sans KR, sans-serif">지금 (대 AI 시대 · AI-Book: Learning Log) : 실무 결과물에서 출발해 개념과 원리를 역추적</text>
-
-                    <rect x="14" y="118" width="175" height="44" rx="6" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.6"/>
-                    <text x="101" y="136" text-anchor="middle" font-size="11" font-weight="700" fill="#1c1917">01. 실무 투입 · 프롬프트 입력</text>
-                    <text x="101" y="152" text-anchor="middle" font-size="9.5" fill="#57534e">원하는 요구사항 정의</text>
-
-                    <line x1="189" y1="140" x2="243" y2="140" stroke="#2c3e50" stroke-width="2" class="svg-flow-line" marker-end="url(#arrowNavy)"/>
-
-                    <rect x="248" y="118" width="175" height="44" rx="6" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.6"/>
-                    <text x="335" y="136" text-anchor="middle" font-size="11" font-weight="700" fill="#1c1917">02. 그럴듯한 결과물 즉시 도출</text>
-                    <text x="335" y="152" text-anchor="middle" font-size="9.5" fill="#7c5e3c">"내가 진정 알고 일하고 있나?"</text>
-
-                    <line x1="423" y1="140" x2="477" y2="140" stroke="#7c5e3c" stroke-width="2.2" class="svg-flow-fast" marker-end="url(#arrowBronze)"/>
-
-                    <rect x="482" y="116" width="184" height="48" rx="6" fill="#2c3e50" stroke="#1c1917" stroke-width="1.6" class="svg-pulse-node"/>
-                    <text x="574" y="136" text-anchor="middle" font-size="11.5" font-weight="700" fill="#faf8f3">03. 개념 · 용어 · 원리 역추적</text>
-                    <text x="574" y="153" text-anchor="middle" font-size="9.5" fill="#fcd34d">AI-Book: Learning Log 체화</text>
-
-                    <!-- Feedback Loop Arrow from Step 03 back to Step 01 -->
-                    <path d="M 574 164 Q 335 196 101 164" fill="none" stroke="#7c5e3c" stroke-width="1.6" class="svg-flow-line" marker-end="url(#arrowBronze)"/>
-                    <rect x="235" y="173" width="210" height="18" rx="4" fill="#f3efe6"/>
-                    <text x="340" y="185" text-anchor="middle" font-size="9.5" font-weight="700" fill="#7c5e3c">원리를 아는 실무자의 정교한 엔지니어링 피드백 루프</text>
-                  </svg>
-                </div>
-              </div>
-
-              <!-- 3. 이 책(프로젝트)의 소개 및 구성 원칙 -->
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-lg p-3.5 space-y-1">
-                  <div class="text-[10px] font-mono-code font-bold text-[#7c5e3c]">01 · CONCEPT &amp; GLOSSARY</div>
-                  <h4 class="text-xs font-serif-book font-bold text-stone-900">개념 접근과 필수 용어</h4>
-                  <p class="text-[11px] text-stone-600 leading-relaxed">낯선 AI 기술을 한 줄 비유와 그림 도해로 먼저 이해하고, 해당 개념에 딸린 핵심 용어 사전을 함께 정리합니다.</p>
-                </div>
-                <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-lg p-3.5 space-y-1">
-                  <div class="text-[10px] font-mono-code font-bold text-[#7c5e3c]">02 · LV.1 TO LV.4 DEPTH</div>
-                  <h4 class="text-xs font-serif-book font-bold text-stone-900">초급에서 심화 엔지니어링까지</h4>
-                  <p class="text-[11px] text-stone-600 leading-relaxed">기초 수리·딥러닝·강화학습·온톨로지·에이전트까지 입문(Lv.1)부터 심화(Lv.4) 수준별 탭과 실습을 제공합니다.</p>
-                </div>
-                <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-lg p-3.5 space-y-1">
-                  <div class="text-[10px] font-mono-code font-bold text-[#7c5e3c]">03 · SMART TOC &amp; ROLES</div>
-                  <h4 class="text-xs font-serif-book font-bold text-stone-900">순서대로 끼워 넣는 목차·직군</h4>
-                  <p class="text-[11px] text-stone-600 leading-relaxed">새로 공부한 주제를 기존 목차 번호 사이에 끼워 넣어 Git으로 증보하고, 6대 직군별로 필요한 기술만 모아 봅니다.</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- ============================================================= -->
-            <!-- SECTION B: 6부작 마스터 목차 및 수준별 차례                     -->
-            <!-- ============================================================= -->
-            <div id="frontTocSection" class="space-y-4 pt-2 border-t border-[#dcd6c8]">
-              <div>
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-xs font-bold uppercase tracking-wider text-stone-600">I. 6부작 대분류 아키텍처 (Part 1 — Part 6)</h3>
-                  <span class="text-[11px] text-stone-500">카드를 클릭하면 해당 부의 첫 페이지로 이동합니다</span>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" id="tocCategorySummary">
-                  <!-- Populated by JS -->
-                </div>
-              </div>
-
-              <div>
-                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                  <h3 class="text-xs font-bold uppercase tracking-wider text-stone-600">II. 전체 단원 차례 (목차 번호순 자동 정렬)</h3>
-                  <div class="flex flex-wrap items-center gap-1">
-                    <button type="button" data-tocdiff="all" class="toc-diff-btn px-2.5 py-1 rounded text-[11px] font-semibold bg-[#2c3e50] text-stone-100">전체 수준</button>
-                    <button type="button" data-tocdiff="beginner" class="toc-diff-btn px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">Lv.1 입문</button>
-                    <button type="button" data-tocdiff="elementary" class="toc-diff-btn px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">Lv.2 초급</button>
-                    <button type="button" data-tocdiff="intermediate" class="toc-diff-btn px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">Lv.3 중급</button>
-                    <button type="button" data-tocdiff="advanced" class="toc-diff-btn px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">Lv.4 심화</button>
-                  </div>
-                </div>
-                <div id="tocPagesList" class="space-y-4 max-h-[340px] overflow-y-auto custom-scrollbar pr-2">
-                  <!-- Populated by JS -->
-                </div>
-              </div>
-            </div>
-
+        <!-- 우측: 첫 페이지 (여는 글 · 인사말 & 프로젝트 소개) -->
+        <div class="xl:col-span-7 space-y-6">
+          <div class="border-b-2 border-stone-800 pb-4">
+            <span class="text-xs font-mono-code font-bold tracking-[0.18em] uppercase text-[#7c5e3c]">FIRST PAGE · PROLOGUE &amp; PHILOSOPHY</span>
+            <h2 class="text-2xl sm:text-3xl font-serif-book font-bold text-stone-900 mt-1">여는 글 — 인사말 및 프로젝트 소개</h2>
           </div>
 
-          <!-- Footer Page Number -->
-          <div class="mt-6 pt-3 border-t border-[#e2ddd3] flex items-center justify-between text-xs font-serif-book text-stone-500">
-            <span>AI-Book: Learning Log — 첫 페이지(서문) 및 스마트 목차</span>
-            <span>i — ii</span>
+          <!-- 인사말 본문 (가독성 높은 서적 조판 크기) -->
+          <article class="bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-6 sm:p-8 space-y-4">
+            <div class="flex items-center justify-between border-b border-[#dfd9cc] pb-3">
+              <span class="text-xs font-mono-code font-bold px-2.5 py-1 rounded bg-[#2c3e50] text-stone-100">AUTHOR'S PROLOGUE</span>
+              <span class="text-xs font-serif-book text-stone-500">Page i · 여는 글</span>
+            </div>
+
+            <div class="book-prose font-serif-book space-y-4 text-stone-800 pt-1">
+              <p>
+                비전공자인 내가 IT업계에서 일하고 있지만 요즘 AI 사용 빈도가 높아짐에 따라 일을 쳐내는 데에는 별 무리가 없었지만 항상 <strong class="text-stone-950 underline decoration-[#7c5e3c] decoration-2 underline-offset-4">"내가 진정 알고 일을 하고 있나"</strong>라는 질문이 머릿속을 떠나지 않았다.
+              </p>
+              <p>
+                그리고 대 AI 시대에 이전에는 공부를 하지 않으면 일을 할 수 없었지만 요즘은 바로 실무 투입해서 내가 원하는 것만 잘 입력하면 그럴듯한 결과물이 나오는 시대가 되어버린 지금, 오히려 뒤를 돌아볼 때가 아닌가 하는 생각으로 이 프로젝트를 시작한다.
+              </p>
+            </div>
+
+            <blockquote class="border-l-4 border-[#2c3e50] bg-[#faf8f3] px-5 py-4 rounded-r-xl mt-2">
+              <p class="text-lg sm:text-xl font-serif-book font-bold text-[#2c3e50] tracking-tight">
+                "공부의 순서만 바뀐 것이다. 안 해도 되는 건 아니다."
+              </p>
+            </blockquote>
+          </article>
+
+          <!-- 프로젝트 3대 원칙 소개 -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-4 space-y-1.5">
+              <div class="text-xs font-mono-code font-bold text-[#7c5e3c]">01 · CONCEPT FIRST</div>
+              <h4 class="text-base font-serif-book font-bold text-stone-900">개념 접근과 필수 용어</h4>
+              <p class="text-xs sm:text-sm text-stone-600 leading-relaxed">낯선 기술을 직관적 비유와 큰 도해로 먼저 이해하고 연관 용어 사전을 함께 정리합니다.</p>
+            </div>
+            <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-4 space-y-1.5">
+              <div class="text-xs font-mono-code font-bold text-[#7c5e3c]">02 · LV.1 TO LV.4</div>
+              <h4 class="text-base font-serif-book font-bold text-stone-900">입문에서 심화까지</h4>
+              <p class="text-xs sm:text-sm text-stone-600 leading-relaxed">기초 수리·딥러닝·강화학습·온톨로지·에이전트까지 초급부터 숙련자 과정을 한 흐름으로 담습니다.</p>
+            </div>
+            <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-4 space-y-1.5">
+              <div class="text-xs font-mono-code font-bold text-[#7c5e3c]">03 · SMART TOC</div>
+              <h4 class="text-base font-serif-book font-bold text-stone-900">끼워 넣는 목차 &amp; 직군</h4>
+              <p class="text-xs sm:text-sm text-stone-600 leading-relaxed">새로 공부한 주제를 기존 목차 순서에 맞춰 사이에 끼워 넣으며 6대 직군별로 큐레이션합니다.</p>
+            </div>
           </div>
         </div>
-
       </div>
-    </section>
 
-    <!-- =================================================================== -->
-    <!-- VIEW 1: PAGE-FLIPPING BOOK READER (LEFT: THEORY+FIG / RIGHT: LAB)   -->
-    <!-- =================================================================== -->
-    <section id="view-ebook" class="hidden space-y-3.5">
+      <!-- 2. 대형 애니메이션 그림 설명: 정방향 학습 vs 역방향 학습 (글씨 크기 대폭 확대) -->
+      <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-6 sm:p-8 space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#dcd6c8] pb-3">
+          <div>
+            <span class="text-xs font-mono-code font-bold uppercase tracking-wider text-[#7c5e3c]">FIGURE 0.1 · REVERSE-ORDER LEARNING PARADIGM</span>
+            <h3 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900 mt-0.5">그림 설명: 과거의 정방향 학습 vs 대 AI 시대의 역방향 학습 (AI-Book: Learning Log)</h3>
+          </div>
+          <span class="text-xs font-mono-code text-stone-600">점선 화살표 애니메이션: 결과물에서 개념·원리로 거슬러 올라가는 학습 흐름</span>
+        </div>
 
-      <!-- Quick Part Jump Bar -->
-      <div class="flex flex-wrap items-center justify-between gap-2 bg-[#f3efe6] border border-[#d6cfc2] rounded-lg px-3.5 py-2">
-        <div class="flex flex-wrap items-center gap-1.5" id="chapterCardsContainer">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- 과거 (Pre-AI) -->
+          <div class="bg-[#faf8f3] border border-[#ccc4b4] rounded-xl p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono-code font-bold px-2.5 py-1 rounded bg-stone-200 text-stone-700">과거 (Pre-AI 시대)</span>
+              <span class="text-xs text-stone-500 font-medium">이론을 먼저 끝내야만 실무 진입 가능</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center text-center">
+              <div class="p-3.5 rounded-lg bg-[#ebe6dc] border border-[#ccc4b4]">
+                <div class="text-xs font-mono-code font-bold text-stone-500">STEP 01</div>
+                <div class="text-sm sm:text-base font-bold text-stone-800 mt-1">기초 이론 학습</div>
+                <div class="text-xs text-stone-600 mt-0.5">개념·수식 선행 암기</div>
+              </div>
+              <div class="p-3.5 rounded-lg bg-[#ebe6dc] border border-[#ccc4b4]">
+                <div class="text-xs font-mono-code font-bold text-stone-500">STEP 02</div>
+                <div class="text-sm sm:text-base font-bold text-stone-800 mt-1">기술·코드 구현</div>
+                <div class="text-xs text-stone-600 mt-0.5">수동 엔지니어링</div>
+              </div>
+              <div class="p-3.5 rounded-lg bg-[#ebe6dc] border border-[#ccc4b4]">
+                <div class="text-xs font-mono-code font-bold text-stone-500">STEP 03</div>
+                <div class="text-sm sm:text-base font-bold text-stone-800 mt-1">실무 결과물 도출</div>
+                <div class="text-xs text-stone-600 mt-0.5">최종 산출물 완성</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 현재 (AI 시대 · AI-Book: Learning Log) -->
+          <div class="bg-[#faf8f3] border-2 border-[#2c3e50] rounded-xl p-5 space-y-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono-code font-bold px-2.5 py-1 rounded bg-[#2c3e50] text-white">지금 (AI 시대 · AI-Book: Learning Log)</span>
+              <span class="text-xs text-[#7c5e3c] font-bold">실무 결과물에서 원리를 역추적하여 체화</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center text-center">
+              <div class="p-3.5 rounded-lg bg-[#f3efe6] border border-[#2c3e50]">
+                <div class="text-xs font-mono-code font-bold text-[#2c3e50]">STEP 01</div>
+                <div class="text-sm sm:text-base font-bold text-stone-900 mt-1">실무 투입 · 입력</div>
+                <div class="text-xs text-stone-600 mt-0.5">원하는 요구사항 프롬프트</div>
+              </div>
+              <div class="p-3.5 rounded-lg bg-[#f3efe6] border border-[#7c5e3c]">
+                <div class="text-xs font-mono-code font-bold text-[#7c5e3c]">STEP 02</div>
+                <div class="text-sm sm:text-base font-bold text-stone-900 mt-1">그럴듯한 결과물</div>
+                <div class="text-xs text-[#7c5e3c] font-semibold mt-0.5">"내가 진정 알고 있나?"</div>
+              </div>
+              <div class="p-3.5 rounded-lg bg-[#2c3e50] text-white svg-pulse-node">
+                <div class="text-xs font-mono-code font-bold text-amber-300">STEP 03 · 역추적</div>
+                <div class="text-sm sm:text-base font-bold mt-1">개념 · 용어 · 원리 체화</div>
+                <div class="text-xs text-amber-200 mt-0.5">AI-Book: Learning Log</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 6부작 마스터 목차 & 세부 단원 차례 -->
+      <div class="space-y-8 pt-4 border-t-2 border-stone-800">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <span class="text-xs font-mono-code font-bold tracking-[0.18em] uppercase text-[#7c5e3c]">MASTER CURRICULUM &amp; TABLE OF CONTENTS</span>
+            <h2 class="text-2xl sm:text-3xl font-serif-book font-bold text-stone-900 mt-1">6부작 마스터 목차 및 수준별 차례</h2>
+          </div>
+          <span class="text-xs sm:text-sm font-serif-book text-stone-600">새 주제를 등록하면 목차 번호(sectionCode) 순서에 맞춰 자동으로 끼워 넣어집니다</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="tocCategorySummary">
           <!-- Populated by JS -->
         </div>
 
-        <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-          <button type="button" id="btnBackToToc" class="px-2.5 py-1 rounded text-xs font-medium bg-[#faf8f3] hover:bg-stone-200 text-stone-700 border border-[#ccc4b4] transition shrink-0">
-            서문 · 목차로
-          </button>
-          <select id="pageJumpSelect" aria-label="페이지 바로가기" class="flex-1 sm:flex-initial bg-[#faf8f3] border border-[#ccc4b4] rounded px-2.5 py-1 text-xs text-stone-800 focus:outline-none">
+        <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-6 sm:p-8 space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#dcd6c8] pb-4">
+            <h3 class="text-base sm:text-lg font-serif-book font-bold text-stone-900">전체 세부 단원 차례 (p.01 — p.24)</h3>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button type="button" data-tocdiff="all" class="toc-diff-btn px-3 py-1.5 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100">전체 수준</button>
+              <button type="button" data-tocdiff="beginner" class="toc-diff-btn px-3 py-1.5 rounded text-xs font-medium bg-[#faf8f3] text-stone-700 border border-[#ccc4b4] hover:bg-stone-200">Lv.1 입문</button>
+              <button type="button" data-tocdiff="elementary" class="toc-diff-btn px-3 py-1.5 rounded text-xs font-medium bg-[#faf8f3] text-stone-700 border border-[#ccc4b4] hover:bg-stone-200">Lv.2 초급</button>
+              <button type="button" data-tocdiff="intermediate" class="toc-diff-btn px-3 py-1.5 rounded text-xs font-medium bg-[#faf8f3] text-stone-700 border border-[#ccc4b4] hover:bg-stone-200">Lv.3 중급</button>
+              <button type="button" data-tocdiff="advanced" class="toc-diff-btn px-3 py-1.5 rounded text-xs font-medium bg-[#faf8f3] text-stone-700 border border-[#ccc4b4] hover:bg-stone-200">Lv.4 심화</button>
+            </div>
+          </div>
+          <div id="tocPagesList" class="space-y-6">
             <!-- Populated by JS -->
-          </select>
+          </div>
         </div>
       </div>
 
-      <!-- Mobile-Only Left/Right Page Switcher (<1024px) -->
-      <div class="flex lg:hidden items-center gap-1.5 bg-[#ebe6dc] border border-[#d0c9b8] rounded-lg p-1">
-        <button type="button" id="btnMobilePaneLeft" class="flex-1 py-2 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 transition">
-          좌측면 : 개념 · 그림 도해 · 용어
-        </button>
-        <button type="button" id="btnMobilePaneRight" class="flex-1 py-2 rounded text-xs font-medium text-stone-700 hover:bg-stone-200 transition">
-          우측면 : 단계별 애니메이션 · 코드 · 퀴즈
-        </button>
-      </div>
+    </section>
 
-      <!-- TWO-PAGE OPEN BOOK SPREAD -->
-      <div id="bookSpreadContainer" class="book-shell rounded-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[720px] page-turn-effect">
+    <!-- =================================================================== -->
+    <!-- VIEW 1: FULL-SCREEN EDITORIAL BOOK CHAPTER READER (본문 단행본 뷰)    -->
+    <!-- =================================================================== -->
+    <section id="view-ebook" class="hidden w-full max-w-5xl mx-auto px-5 sm:px-10 xl:px-16 py-8 sm:py-12">
 
-        <!-- LEFT PAGE: BOOK-STYLE THEORY, VISUAL CONCEPT DIAGRAM, DEPTH TABS & GLOSSARY -->
-        <div id="bookLeftPagePane" class="lg:col-span-6 p-5 sm:p-8 lg:p-10 border-b lg:border-b-0 lg:border-r border-[#dcd6c8] flex flex-col justify-between bg-[#faf8f3]">
-          <div class="space-y-5">
-            <!-- Running Header -->
-            <div class="flex items-center justify-between gap-2 border-b border-[#e2ddd3] pb-2.5 text-xs text-stone-500 flex-wrap">
-              <span id="leftPagePartHeader" class="font-serif-book font-semibold text-stone-700">PART I · 기초 개념</span>
-              <button type="button" id="leftPageLayerBtn" class="font-mono-code text-[11px] px-2.5 py-0.5 rounded bg-[#ebe6dc] text-stone-700 hover:bg-stone-300 border border-[#d6cfc2] transition">
+      <article id="bookSpreadContainer" class="space-y-12 page-turn-effect">
+
+        <!-- --------------------------------------------------------------- -->
+        <!-- CHAPTER HEADER (단행본 장·절 머리말 영역)                         -->
+        <!-- --------------------------------------------------------------- -->
+        <header class="border-b-2 border-stone-800 pb-7 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-stone-600">
+            <span id="leftPagePartHeader" class="font-serif-book font-bold text-[#7c5e3c]">PART I · 기초 개념</span>
+            <div class="flex items-center gap-2">
+              <button type="button" id="leftPageLayerBtn" class="font-mono-code text-xs px-3 py-1 rounded bg-[#ebe6dc] text-stone-800 hover:bg-stone-300 border border-[#ccc4b4] transition">
                 L1 · 파운데이션 모델
               </button>
-            </div>
-
-            <!-- Section Code, Difficulty Badge & Main Title -->
-            <div>
-              <div class="flex items-center justify-between gap-2 flex-wrap">
-                <span id="leftPageSectionNum" class="text-xs font-mono-code font-bold tracking-wider uppercase text-[#7c5e3c]">SECTION 1.1</span>
-                <span id="leftPageDifficultyBadge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded border">Lv.1 입문</span>
-              </div>
-              <h2 id="leftPageTitle" class="text-xl sm:text-2xl font-serif-book font-bold text-stone-900 mt-1.5 leading-snug">
-                단원 제목
-              </h2>
-            </div>
-
-            <!-- Section 1: Everyday Analogy -->
-            <div class="space-y-1.5">
-              <h3 class="text-xs font-bold uppercase tracking-wider text-stone-500">01 · 개념 직관 (한 줄 비유)</h3>
-              <blockquote class="border-l-4 border-[#7c5e3c] pl-4 py-2.5 bg-[#f3efe6] rounded-r-lg">
-                <p id="leftPageAnalogy" class="text-xs sm:text-sm font-serif-book text-stone-900 leading-relaxed">
-                  비유 설명
-                </p>
-              </blockquote>
-            </div>
-
-            <!-- Section 2: Animated Visual Concept Diagram (그림 설명 & 애니메이션 도해) -->
-            <div class="space-y-2">
-              <div class="flex items-center justify-between gap-2 flex-wrap">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-stone-500">02 · 핵심 메커니즘 그림 설명 (애니메이션 도해)</h3>
-                <button type="button" id="btnToggleDiagramAnim" class="text-[11px] font-mono-code px-2 py-0.5 rounded bg-[#ebe6dc] hover:bg-stone-300 text-stone-700 border border-[#ccc4b4] transition">
-                  애니메이션 일시정지
-                </button>
-              </div>
-              <div id="leftPageConceptDiagramBox" class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-3.5 overflow-x-auto">
-                <!-- Populated by JS SVG Concept Illustrator -->
-              </div>
-            </div>
-
-            <!-- Section 3: Multi-Level Depth Explanation & Study Guide Tabs -->
-            <div class="space-y-2.5">
-              <div class="flex flex-wrap items-center justify-between gap-1.5 border-b border-[#e2ddd3] pb-1.5">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-stone-500">03 · 수준별 원리 해설 및 공부 순서</h3>
-                <div class="flex flex-wrap items-center gap-1">
-                  <button type="button" data-depthtab="all" class="left-depth-tab px-2.5 py-1 rounded text-[11px] font-semibold bg-[#2c3e50] text-stone-100">종합 해설</button>
-                  <button type="button" data-depthtab="beginner" class="left-depth-tab px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] text-stone-700">Lv.1 입문</button>
-                  <button type="button" data-depthtab="intermediate" class="left-depth-tab px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] text-stone-700">Lv.3 중급</button>
-                  <button type="button" data-depthtab="advanced" class="left-depth-tab px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] text-stone-700">Lv.4 심화</button>
-                  <button type="button" data-depthtab="study" class="left-depth-tab px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] text-stone-700">공부 순서</button>
-                </div>
-              </div>
-              <div id="leftPageDefinition" class="editorial-prose text-xs sm:text-sm text-stone-800 space-y-2.5">
-                <!-- Populated with structured paragraphs -->
-              </div>
-              <div id="leftPageDeepNote" class="text-xs text-stone-800 leading-[1.8] bg-[#f3efe6] p-3.5 rounded-lg border border-[#dcd6c8]">
-                실무 포인트 및 공부 방법 가이드
-              </div>
-            </div>
-
-            <!-- Section 4: Concept Mini Glossary (관련 용어 정리) -->
-            <div id="leftPageKeyTermsBox" class="space-y-2 pt-1">
-              <h3 class="text-xs font-bold uppercase tracking-wider text-stone-500">04 · 이 개념의 필수 연관 용어 사전</h3>
-              <div id="leftPageKeyTermsList" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <!-- Populated by JS -->
-              </div>
-            </div>
-
-            <!-- Section 5: Recommended Job Roles & Related Tools -->
-            <div class="space-y-2 pt-1">
-              <h3 class="text-xs font-bold uppercase tracking-wider text-stone-500">05 · 연관 직군 트랙 및 실전 도구</h3>
-              <div id="leftPageRolesContainer" class="flex flex-wrap gap-1.5">
-                <!-- Populated by JS -->
-              </div>
-              <div id="leftPageRelatedTools" class="flex flex-wrap gap-1.5 pt-0.5">
-                <!-- Populated by JS -->
-              </div>
+              <span id="leftPageDifficultyBadge" class="text-xs font-semibold px-3 py-1 rounded border">Lv.1 입문</span>
             </div>
           </div>
 
-          <!-- Left Page Footer -->
-          <div class="mt-6 pt-3.5 border-t border-[#e2ddd3] flex items-center justify-between flex-wrap gap-2">
-            <span id="leftPageNumber" class="text-xs font-serif-book font-semibold text-stone-500">p. 01</span>
+          <div class="space-y-2 pt-1">
+            <div id="leftPageSectionNum" class="text-xs sm:text-sm font-mono-code font-bold tracking-wider uppercase text-stone-500">
+              CHAPTER 1.1 · PAGE 01 OF 24
+            </div>
+            <h1 id="leftPageTitle" class="text-2xl sm:text-3xl lg:text-4xl font-serif-book font-bold text-stone-900 leading-tight tracking-tight">
+              단원 제목
+            </h1>
+          </div>
+
+          <!-- 직군 트랙 배지 & 책갈피/완독 도구 모음 -->
+          <div class="pt-2 flex flex-wrap items-center justify-between gap-3">
+            <div id="leftPageRolesContainer" class="flex flex-wrap gap-1.5">
+              <!-- Populated by JS -->
+            </div>
             <div class="flex items-center gap-2">
-              <button type="button" id="btnToggleBookmark" class="px-3 py-1 rounded text-xs font-medium border border-[#ccc4b4] bg-[#f3efe6] text-stone-700 hover:bg-stone-200 transition">
+              <button type="button" id="btnToggleBookmark" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium border border-[#ccc4b4] bg-[#f3efe6] text-stone-700 hover:bg-stone-200 transition">
                 책갈피 추가
               </button>
-              <button type="button" id="btnToggleLearned" class="px-3 py-1 rounded text-xs font-semibold border border-[#2c3e50] bg-[#faf8f3] text-[#2c3e50] hover:bg-stone-200 transition">
+              <button type="button" id="btnToggleLearned" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold border border-[#2c3e50] bg-[#2c3e50] text-white hover:bg-[#1e2b38] transition">
                 학습 완료 표시
               </button>
             </div>
           </div>
-        </div>
+        </header>
 
-        <!-- RIGHT PAGE: INTERACTIVE ANIMATION PLAYER, CODING SANDBOX & QUIZ -->
-        <div id="bookRightPagePane" class="lg:col-span-6 p-5 sm:p-8 lg:p-10 bg-[#f6f3ec] book-spine-divider flex flex-col justify-between">
-          <div class="space-y-4">
-            <!-- Right Page Mode Switcher Header (3 Modes) -->
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#dcd6c8] pb-2.5">
-              <span class="text-xs font-serif-book font-semibold text-stone-600">우측 도판 · 단계별 시뮬레이션 및 자가진단</span>
-              <div class="flex items-center gap-1 bg-[#e8e3d8] p-0.5 rounded border border-[#d0c9b8]">
-                <button type="button" id="btnLabModeVisual" class="px-2.5 py-1 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 transition">
-                  1. 단계별 애니메이션
-                </button>
-                <button type="button" id="btnLabModeCode" class="px-2.5 py-1 rounded text-xs font-medium text-stone-700 hover:bg-stone-300/60 transition">
-                  2. 코딩 실습
-                </button>
-                <button type="button" id="btnLabModeQuiz" class="px-2.5 py-1 rounded text-xs font-medium text-stone-700 hover:bg-stone-300/60 transition">
-                  3. 문제 풀이 · 메모
-                </button>
-              </div>
+        <!-- --------------------------------------------------------------- -->
+        <!-- § 1. 핵심 개념 직관과 본질 해설 (서적 본문 조판)                   -->
+        <!-- --------------------------------------------------------------- -->
+        <section class="space-y-6">
+          <div class="book-section-heading">
+            <span class="text-xs sm:text-sm font-mono-code font-bold text-[#7c5e3c]">SECTION 01</span>
+            <h2 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900">개념 직관과 핵심 원리 해설</h2>
+          </div>
+
+          <!-- 한 줄 비유 (큰 명조체 인용구) -->
+          <blockquote class="border-l-4 border-[#7c5e3c] pl-5 sm:pl-6 py-4 bg-[#f3efe6] rounded-r-xl">
+            <div class="text-xs font-mono-code font-bold uppercase tracking-wider text-[#7c5e3c] mb-1">INTUITIVE ANALOGY · 핵심 비유</div>
+            <p id="leftPageAnalogy" class="text-base sm:text-lg font-serif-book font-semibold text-stone-900 leading-relaxed">
+              비유 설명
+            </p>
+          </blockquote>
+
+          <!-- 본문 상세 해설 (17px 단행본 가독성 조판) -->
+          <div id="leftPageDefinition" class="book-prose space-y-4">
+            <!-- Populated by JS -->
+          </div>
+
+          <!-- 실무 엔지니어링 포인트 박스 -->
+          <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-5 sm:p-6 space-y-1.5">
+            <div class="text-xs font-mono-code font-bold uppercase tracking-wider text-[#2c3e50]">PRACTICAL ENGINEERING NOTE · 실무 핵심 포인트</div>
+            <div id="leftPageDeepNote" class="text-sm sm:text-base text-stone-800 leading-[1.85]">
+              실무 포인트
+            </div>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------- -->
+        <!-- § 2. 대형 인터랙티브 그림 설명 & 단계별 작동 애니메이션 도판       -->
+        <!-- --------------------------------------------------------------- -->
+        <section class="space-y-5">
+          <div class="book-section-heading justify-between flex-wrap">
+            <div class="flex items-center gap-3">
+              <span class="text-xs sm:text-sm font-mono-code font-bold text-[#7c5e3c]">SECTION 02</span>
+              <h2 id="visualDiagramTitle" class="text-lg sm:text-xl font-serif-book font-bold text-stone-900">그림과 애니메이션으로 보는 작동 구조</h2>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" id="btnToggleDiagramAnim" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#ebe6dc] hover:bg-stone-300 text-stone-700 border border-[#ccc4b4] transition">
+                점선 흐름 일시정지
+              </button>
+              <button type="button" id="btnPlayProcess" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-[#2c3e50] hover:bg-[#1e2b38] text-white transition">
+                단계 자동 재생
+              </button>
+              <button type="button" id="btnNextStepProcess" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium bg-[#ebe6dc] hover:bg-stone-300 text-stone-800 border border-[#ccc4b4] transition">
+                다음 단계 →
+              </button>
+            </div>
+          </div>
+
+          <!-- 대형 도판 프레임 (가로 폭 100% 활용, 큼직한 텍스트) -->
+          <div class="bg-[#f3efe6] border-2 border-[#d6cfc2] rounded-2xl p-5 sm:p-7 space-y-6 shadow-sm">
+
+            <!-- 1) 단원별 맞춤 대형 SVG 그림 설명 -->
+            <div id="leftPageConceptDiagramBox" class="bg-[#faf8f3] border border-[#dcd6c8] rounded-xl p-4 sm:p-6 overflow-x-auto">
+              <!-- Populated by JS with large-font SVG schematic -->
             </div>
 
-            <!-- SUB-MODE 1: VISUAL STEP-BY-STEP PROCESS PLAYER -->
-            <div id="rightPaneVisualPlayer" class="space-y-4">
-              <div class="flex items-center justify-between gap-2 flex-wrap">
-                <div>
-                  <div class="text-[11px] font-mono-code font-semibold uppercase tracking-wider text-[#7c5e3c]">STEP-BY-STEP ANIMATED SIMULATION</div>
-                  <h3 id="visualDiagramTitle" class="text-sm sm:text-base font-serif-book font-bold text-stone-900">작동 과정 단계별 시뮬레이션</h3>
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <button type="button" id="btnPlayProcess" class="px-3 py-1 rounded text-xs font-semibold bg-[#2c3e50] hover:bg-[#1e2b38] text-stone-100 transition">
-                    과정 자동 재생
-                  </button>
-                  <button type="button" id="btnNextStepProcess" class="px-2.5 py-1 rounded text-xs font-medium bg-[#ebe6dc] hover:bg-stone-300 text-stone-800 border border-[#ccc4b4] transition">
-                    다음 단계 →
-                  </button>
-                </div>
+            <!-- 2) 4단계 프로세스 탭 버튼 (큰 글씨) -->
+            <div class="space-y-3">
+              <div class="flex items-center justify-between text-xs sm:text-sm font-semibold text-stone-600">
+                <span>작동 단계 선택 (클릭하면 상단 도해와 아래 세부 흐름이 연동됩니다)</span>
+                <span id="processStepStatus" class="font-mono-code text-xs text-[#7c5e3c]">STEP-BY-STEP INTERACTIVE</span>
               </div>
-
-              <!-- Step Progress Indicators (Step 1 ~ Step 4) -->
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5" id="processStepTabs">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="processStepTabs">
                 <!-- Populated by JS -->
               </div>
-
-              <!-- Dynamic Visual Canvas Stage (Animated SVG + Pipeline Nodes) -->
-              <div id="visualStageBox" class="bg-[#faf8f3] border border-[#d6cfc2] rounded-xl p-4 min-h-[260px] flex flex-col justify-between">
-                <!-- Populated dynamically -->
-              </div>
-
-              <!-- Step Narrative Caption Box -->
-              <div class="bg-[#ebe6dc] border border-[#d0c9b8] rounded-lg p-4 space-y-1.5">
-                <div class="flex items-center justify-between text-[11px] font-mono-code font-semibold text-[#7c5e3c]">
-                  <span id="processStepBadge">STEP 01 / 04</span>
-                  <span id="processStepStatus" class="text-stone-600">단계를 선택하거나 자동 재생을 실행하세요</span>
-                </div>
-                <p id="processStepCaption" class="text-xs sm:text-sm text-stone-900 font-medium leading-relaxed">
-                  단계별 설명 자막이 이곳에 표시됩니다.
-                </p>
-              </div>
             </div>
 
-            <!-- SUB-MODE 2: INTERACTIVE HANDS-ON CODING & PARAMETER LAB -->
-            <div id="rightPaneCodeLab" class="hidden space-y-4">
+            <!-- 3) 현재 단계의 세부 노드 파이프라인 & 해설 자막 -->
+            <div id="visualStageBox" class="space-y-4">
+              <!-- Populated by JS -->
+            </div>
+
+            <div class="bg-[#faf8f3] border-l-4 border-[#2c3e50] rounded-r-xl p-4 sm:p-5 space-y-1.5">
+              <div id="processStepBadge" class="text-xs font-mono-code font-bold text-[#7c5e3c]">STEP 01 / 04</div>
+              <p id="processStepCaption" class="text-sm sm:text-base text-stone-900 font-medium leading-relaxed">
+                단계별 상세 설명이 이곳에 표시됩니다.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------- -->
+        <!-- § 3. 입문에서 심화까지 수준별 심층 해설 & 추천 공부 순서           -->
+        <!-- --------------------------------------------------------------- -->
+        <section class="space-y-5">
+          <div class="book-section-heading">
+            <span class="text-xs sm:text-sm font-mono-code font-bold text-[#7c5e3c]">SECTION 03</span>
+            <h2 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900">입문부터 심화까지 수준별 확장 &amp; 공부 순서</h2>
+          </div>
+
+          <!-- 탭으로 가리지 않고 책처럼 3단계(입문/중급/심화)를 모두 펼쳐 보여주는 카드 리스트 -->
+          <div id="multiDepthCardsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Populated by JS (Lv.1 입문 / Lv.3 중급 / Lv.4 심화) -->
+          </div>
+
+          <!-- 체계적 공부 순서 로드맵 -->
+          <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-5 sm:p-6 space-y-3">
+            <div class="text-xs font-mono-code font-bold uppercase tracking-wider text-[#7c5e3c]">RECOMMENDED STUDY ORDER · 추천 공부 방법 및 학습 순서</div>
+            <div id="studyOrderStepsContainer" class="space-y-2.5 text-sm sm:text-base text-stone-800 leading-relaxed">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------- -->
+        <!-- § 4. 이 개념의 필수 연관 용어 사전 (Glossary)                     -->
+        <!-- --------------------------------------------------------------- -->
+        <section id="leftPageKeyTermsBox" class="space-y-5">
+          <div class="book-section-heading">
+            <span class="text-xs sm:text-sm font-mono-code font-bold text-[#7c5e3c]">SECTION 04</span>
+            <h2 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900">이 단원의 필수 연관 용어 사전</h2>
+          </div>
+          <div id="leftPageKeyTermsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Populated by JS -->
+          </div>
+          <div class="pt-1 flex flex-wrap items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-stone-500 mr-1">연계 실전 도구 · 모델:</span>
+            <div id="leftPageRelatedTools" class="flex flex-wrap gap-2">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------- -->
+        <!-- § 5. 실전 코딩 실습 & 자가진단 문제 풀이 · 나의 Learning Log       -->
+        <!-- --------------------------------------------------------------- -->
+        <section class="space-y-6">
+          <div class="book-section-heading">
+            <span class="text-xs sm:text-sm font-mono-code font-bold text-[#7c5e3c]">SECTION 05</span>
+            <h2 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900">실전 코드 시뮬레이션 &amp; 확인 문제 풀이</h2>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            <!-- 좌측(또는 상단): 코딩 샌드박스 -->
+            <div class="xl:col-span-7 bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-5 sm:p-6 space-y-4">
               <div>
-                <div class="text-[11px] font-mono-code font-semibold uppercase tracking-wider text-[#7c5e3c]">HANDS-ON SANDBOX</div>
-                <h3 class="text-sm sm:text-base font-serif-book font-bold text-stone-900">실전 파라미터 조절 및 코드 시뮬레이션</h3>
-                <p class="text-xs text-stone-600 mt-0.5">설정값이나 코드를 직접 수정한 뒤 [실행해보기]를 눌러 결과를 확인하세요.</p>
+                <div class="text-xs font-mono-code font-bold uppercase tracking-wider text-[#7c5e3c]">HANDS-ON CODE SANDBOX</div>
+                <h3 class="text-base sm:text-lg font-serif-book font-bold text-stone-900 mt-0.5">실전 파라미터 조절 및 코드 실행</h3>
               </div>
 
-              <div id="interactiveParamBox" class="bg-[#faf8f3] border border-[#d6cfc2] rounded-lg p-3.5 space-y-2">
+              <div id="interactiveParamBox" class="bg-[#faf8f3] border border-[#d6cfc2] rounded-xl p-4 space-y-2">
                 <!-- Populated by JS -->
               </div>
 
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between flex-wrap gap-1">
-                  <span id="codeEditorLangLabel" class="text-[11px] font-mono-code font-semibold text-stone-600">Python / CLI 실습 코드</span>
-                  <div class="flex items-center gap-1.5">
-                    <button type="button" id="btnCopyLabCode" class="px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] hover:bg-stone-300 text-stone-800 border border-[#ccc4b4]">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <span id="codeEditorLangLabel" class="text-xs font-mono-code font-semibold text-stone-700">Python / CLI 실습 코드</span>
+                  <div class="flex items-center gap-2">
+                    <button type="button" id="btnCopyLabCode" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#faf8f3] hover:bg-stone-200 text-stone-800 border border-[#ccc4b4]">
                       코드 복사
                     </button>
-                    <button type="button" id="btnRunLabCode" class="px-3 py-1 rounded text-xs font-semibold bg-[#2c3e50] hover:bg-[#1e2b38] text-stone-100">
+                    <button type="button" id="btnRunLabCode" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#2c3e50] hover:bg-[#1e2b38] text-white">
                       실행해보기 (Run)
                     </button>
                   </div>
                 </div>
-                <textarea id="labCodeEditor" rows="7" spellcheck="false" class="w-full font-mono-code text-xs bg-[#1e1e1e] text-[#e5e5e5] rounded-lg p-3.5 border border-stone-700 focus:outline-none focus:border-stone-500 leading-relaxed custom-scrollbar"></textarea>
+                <textarea id="labCodeEditor" rows="8" spellcheck="false" class="w-full font-mono-code text-xs sm:text-sm bg-[#1e1e1e] text-[#e5e5e5] rounded-xl p-4 border border-stone-700 focus:outline-none focus:border-stone-500 leading-relaxed custom-scrollbar"></textarea>
               </div>
 
-              <div class="space-y-1">
-                <div class="flex items-center justify-between text-[11px] font-mono-code text-stone-500">
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between text-xs font-mono-code text-stone-600">
                   <span>실행 결과 콘솔 (Terminal Output)</span>
                   <span id="labRunStatus">Ready</span>
                 </div>
-                <pre id="labConsoleOutput" class="w-full font-mono-code text-xs bg-[#141413] text-[#d4d0c8] rounded-lg p-3.5 border border-stone-800 min-h-[125px] max-h-[190px] overflow-y-auto custom-scrollbar whitespace-pre-wrap leading-relaxed"></pre>
+                <pre id="labConsoleOutput" class="w-full font-mono-code text-xs sm:text-sm bg-[#141413] text-[#d4d0c8] rounded-xl p-4 border border-stone-800 min-h-[120px] max-h-[220px] overflow-y-auto custom-scrollbar whitespace-pre-wrap leading-relaxed"></pre>
               </div>
             </div>
 
-            <!-- SUB-MODE 3: INTERACTIVE CONCEPT QUIZ & PERSONAL STUDY NOTE -->
-            <div id="rightPaneQuizLab" class="hidden space-y-4">
-              <div>
-                <div class="text-[11px] font-mono-code font-semibold uppercase tracking-wider text-[#7c5e3c]">SELF-CHECK QUIZ &amp; LEARNING LOG</div>
-                <h3 class="text-sm sm:text-base font-serif-book font-bold text-stone-900">핵심 개념 확인 문제 풀이 및 내 학습 기록</h3>
-                <p class="text-xs text-stone-600 mt-0.5">방금 읽은 개념을 퀴즈로 점검하고 나만의 요약 메모를 남겨보세요.</p>
-              </div>
-
-              <div id="quizInteractiveContainer" class="space-y-4">
-                <!-- Populated by JS -->
-              </div>
+            <!-- 우측(또는 하단): 자가진단 퀴즈 & 내 학습 기록 -->
+            <div class="xl:col-span-5" id="quizInteractiveContainer">
+              <!-- Populated by JS -->
             </div>
+          </div>
+        </section>
 
+        <!-- --------------------------------------------------------------- -->
+        <!-- CHAPTER FOOTER NAVIGATION (이전 단원 / 다음 단원 책장 넘김)        -->
+        <!-- --------------------------------------------------------------- -->
+        <footer class="pt-8 border-t-2 border-stone-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <button type="button" id="btnPrevPage" class="flex-1 text-left p-4 rounded-xl bg-[#f3efe6] hover:bg-[#eae4d7] border border-[#ccc4b4] transition">
+            <div class="text-xs font-mono-code text-stone-500">← PREVIOUS CHAPTER</div>
+            <div id="prevChapterLabel" class="text-sm sm:text-base font-serif-book font-bold text-stone-900 mt-0.5">이전 단원</div>
+          </button>
+
+          <div class="text-center px-4 py-2">
+            <span id="leftPageNumber" class="text-sm font-serif-book font-bold text-stone-600">p. 01</span>
+            <span id="rightPageNumber" class="hidden"></span>
           </div>
 
-          <!-- Right Page Footer & Page Flip Controls -->
-          <div class="mt-6 pt-3.5 border-t border-[#dcd6c8] flex items-center justify-between flex-wrap gap-2">
-            <div class="flex items-center gap-2">
-              <button type="button" id="btnPrevPage" class="px-3.5 py-1.5 rounded text-xs font-semibold bg-[#ebe6dc] hover:bg-[#dfd9cc] text-stone-800 border border-[#ccc4b4] transition">
-                ← 이전 페이지
-              </button>
-              <button type="button" id="btnNextPage" class="px-3.5 py-1.5 rounded text-xs font-semibold bg-[#2c3e50] hover:bg-[#1e2b38] text-stone-100 transition">
-                다음 페이지 →
-              </button>
-            </div>
-            <span id="rightPageNumber" class="text-xs font-serif-book font-semibold text-stone-500">실습 도판 · p. 01</span>
-          </div>
-        </div>
+          <button type="button" id="btnNextPage" class="flex-1 text-right p-4 rounded-xl bg-[#2c3e50] hover:bg-[#1e2b38] text-white transition">
+            <div class="text-xs font-mono-code text-amber-300">NEXT CHAPTER →</div>
+            <div id="nextChapterLabel" class="text-sm sm:text-base font-serif-book font-bold mt-0.5">다음 단원</div>
+          </button>
+        </footer>
 
-      </div>
+      </article>
     </section>
 
     <!-- =================================================================== -->
     <!-- VIEW 2: JOB ROLES CURATION & ROADMAP (직군별 맞춤 기술·개념·용어)     -->
     <!-- =================================================================== -->
-    <section id="view-roles" class="hidden space-y-5">
-      <div class="book-shell rounded-xl p-6 sm:p-8 space-y-6">
-        <div class="border-b border-[#dcd6c8] pb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <span class="text-[11px] font-mono-code font-semibold uppercase tracking-widest text-[#7c5e3c]">ROLE-BASED AI COMPETENCY MAP</span>
-            <h2 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900 mt-0.5">6대 직업군별 필수 기술 · 개념 · 용어 로드맵</h2>
-          </div>
-          <p class="text-xs text-stone-600">내 직무를 선택하면 입문부터 심화까지 필요한 개념, 핵심 용어, 추천 단원을 따로 모아 볼 수 있습니다.</p>
+    <section id="view-roles" class="hidden w-full max-w-6xl mx-auto px-5 sm:px-10 xl:px-16 py-8 sm:py-12 space-y-6">
+      <div class="border-b-2 border-stone-800 pb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <span class="text-xs font-mono-code font-bold uppercase tracking-widest text-[#7c5e3c]">APPENDIX A · ROLE-BASED AI COMPETENCY MAP</span>
+          <h2 class="text-2xl sm:text-3xl font-serif-book font-bold text-stone-900 mt-1">6대 직업군별 필수 기술 · 개념 · 용어 로드맵</h2>
         </div>
+        <p class="text-sm text-stone-600">내 직무를 선택하면 입문부터 심화까지 필요한 개념, 핵심 용어, 추천 단원을 따로 모아 볼 수 있습니다.</p>
+      </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div class="lg:col-span-4 space-y-2.5" id="jobRolesList">
-            <!-- Populated by JS -->
-          </div>
-          <div class="lg:col-span-8 bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-5 sm:p-6 space-y-5" id="jobRoleDetail">
-            <!-- Populated by JS -->
-          </div>
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div class="lg:col-span-4 space-y-2.5" id="jobRolesList">
+          <!-- Populated by JS -->
+        </div>
+        <div class="lg:col-span-8 bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-6 sm:p-8 space-y-6" id="jobRoleDetail">
+          <!-- Populated by JS -->
         </div>
       </div>
     </section>
@@ -643,23 +629,21 @@
     <!-- =================================================================== -->
     <!-- VIEW 3: 5-LAYER ARCHITECTURE BLUEPRINT                              -->
     <!-- =================================================================== -->
-    <section id="view-architecture" class="hidden space-y-5">
-      <div class="book-shell rounded-xl p-6 sm:p-8 space-y-6">
-        <div class="border-b border-[#dcd6c8] pb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <span class="text-[11px] font-mono-code font-semibold uppercase tracking-widest text-[#7c5e3c]">ARCHITECTURAL BLUEPRINT</span>
-            <h2 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900 mt-0.5">AI 엔지니어링 5계층 구조도</h2>
-          </div>
-          <p class="text-xs text-stone-600">좌측의 5개 계층을 선택하면 해당 층의 역할과 데이터 흐름 도해, 소속 단원·프로그램을 확인할 수 있습니다.</p>
+    <section id="view-architecture" class="hidden w-full max-w-6xl mx-auto px-5 sm:px-10 xl:px-16 py-8 sm:py-12 space-y-6">
+      <div class="border-b-2 border-stone-800 pb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <span class="text-xs font-mono-code font-bold uppercase tracking-widest text-[#7c5e3c]">APPENDIX B · ARCHITECTURAL BLUEPRINT</span>
+          <h2 class="text-2xl sm:text-3xl font-serif-book font-bold text-stone-900 mt-1">AI 엔지니어링 5계층 구조도</h2>
         </div>
+        <p class="text-sm text-stone-600">좌측의 5개 계층을 선택하면 해당 층의 역할과 소속 단원·프로그램을 확인할 수 있습니다.</p>
+      </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div class="lg:col-span-5 space-y-2.5" id="archLayersList">
-            <!-- Populated by JS -->
-          </div>
-          <div class="lg:col-span-7 bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-5 sm:p-6 space-y-5" id="archLayerDetail">
-            <!-- Populated by JS -->
-          </div>
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div class="lg:col-span-5 space-y-2.5" id="archLayersList">
+          <!-- Populated by JS -->
+        </div>
+        <div class="lg:col-span-7 bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-6 sm:p-8 space-y-6" id="archLayerDetail">
+          <!-- Populated by JS -->
         </div>
       </div>
     </section>
@@ -667,93 +651,88 @@
     <!-- =================================================================== -->
     <!-- VIEW 4: PRACTICAL TOOLS & MODELS DIRECTORY                          -->
     <!-- =================================================================== -->
-    <section id="view-tools" class="hidden space-y-5">
-      <div class="book-shell rounded-xl p-6 sm:p-8 space-y-6">
-        <div class="border-b border-[#dcd6c8] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <span class="text-[11px] font-mono-code font-semibold uppercase tracking-widest text-[#7c5e3c]">TOOL &amp; MODEL INDEX</span>
-            <h2 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900 mt-0.5">실전 프로그램 · 오픈소스 툴 · 모델 색인</h2>
-          </div>
-          <div class="flex flex-wrap gap-1.5">
-            <button type="button" data-toolcat="all" class="tool-cat-btn px-3 py-1 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100">전체</button>
-            <button type="button" data-toolcat="agent" class="tool-cat-btn px-3 py-1 rounded text-xs font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">자율 에이전트/하네스</button>
-            <button type="button" data-toolcat="local" class="tool-cat-btn px-3 py-1 rounded text-xs font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">로컬 실행/전사/압축</button>
-            <button type="button" data-toolcat="model" class="tool-cat-btn px-3 py-1 rounded text-xs font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">핵심 파운데이션 모델</button>
-            <button type="button" data-toolcat="eval" class="tool-cat-btn px-3 py-1 rounded text-xs font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">온톨로지/검증/환경</button>
-          </div>
+    <section id="view-tools" class="hidden w-full max-w-6xl mx-auto px-5 sm:px-10 xl:px-16 py-8 sm:py-12 space-y-6">
+      <div class="border-b-2 border-stone-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-mono-code font-bold uppercase tracking-widest text-[#7c5e3c]">APPENDIX C · TOOL &amp; MODEL INDEX</span>
+          <h2 class="text-2xl sm:text-3xl font-serif-book font-bold text-stone-900 mt-1">실전 프로그램 · 오픈소스 툴 · 모델 색인</h2>
         </div>
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" data-toolcat="all" class="tool-cat-btn px-3 py-1.5 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100">전체</button>
+          <button type="button" data-toolcat="agent" class="tool-cat-btn px-3 py-1.5 rounded text-xs font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">자율 에이전트/하네스</button>
+          <button type="button" data-toolcat="local" class="tool-cat-btn px-3 py-1.5 rounded text-xs font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">로컬 실행/전사/압축</button>
+          <button type="button" data-toolcat="model" class="tool-cat-btn px-3 py-1.5 rounded text-xs font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">핵심 파운데이션 모델</button>
+          <button type="button" data-toolcat="eval" class="tool-cat-btn px-3 py-1.5 rounded text-xs font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300">온톨로지/검증/환경</button>
+        </div>
+      </div>
 
-        <div id="toolsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Populated by JS -->
-        </div>
+      <div id="toolsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- Populated by JS -->
       </div>
     </section>
 
     <!-- =================================================================== -->
     <!-- VIEW 5: PRACTICAL PLAYBOOK RECIPES                                  -->
     <!-- =================================================================== -->
-    <section id="view-playbook" class="hidden space-y-5">
-      <div class="book-shell rounded-xl p-6 sm:p-8 space-y-6">
-        <div class="border-b border-[#dcd6c8] pb-4">
-          <span class="text-[11px] font-mono-code font-semibold uppercase tracking-widest text-[#7c5e3c]">PRACTICAL RECIPES</span>
-          <h2 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900 mt-0.5">상황별 모델 · 온톨로지 · 프로그램 조합 레시피</h2>
-          <p class="text-xs text-stone-600 mt-1">목적에 따라 어떤 지식 구조와 어떤 모델·도구를 결합해야 하는지 정리한 실무 조합표입니다.</p>
-        </div>
+    <section id="view-playbook" class="hidden w-full max-w-6xl mx-auto px-5 sm:px-10 xl:px-16 py-8 sm:py-12 space-y-6">
+      <div class="border-b-2 border-stone-800 pb-4">
+        <span class="text-xs font-mono-code font-bold uppercase tracking-widest text-[#7c5e3c]">APPENDIX D · PRACTICAL RECIPES</span>
+        <h2 class="text-2xl sm:text-3xl font-serif-book font-bold text-stone-900 mt-1">상황별 모델 · 온톨로지 · 프로그램 조합 레시피</h2>
+        <p class="text-sm text-stone-600 mt-1">목적에 따라 어떤 지식 구조와 어떤 모델·도구를 결합해야 하는지 정리한 실무 조합표입니다.</p>
+      </div>
 
-        <div id="playbookGrid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <!-- Populated by JS -->
-        </div>
+      <div id="playbookGrid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- Populated by JS -->
       </div>
     </section>
 
     <!-- =================================================================== -->
     <!-- VIEW 6: FULL GLOSSARY & CONCEPT INDEX GRID                          -->
     <!-- =================================================================== -->
-    <section id="view-indexgrid" class="hidden space-y-5">
-      <div class="book-shell rounded-xl p-6 sm:p-8 space-y-5">
-        <div class="border-b border-[#dcd6c8] pb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <span class="text-[11px] font-mono-code font-semibold uppercase tracking-widest text-[#7c5e3c]">CONCEPT &amp; GLOSSARY INDEX</span>
-            <h2 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900 mt-0.5">전체 수록 개념 및 하위 용어 한눈에 보기</h2>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <select id="indexFilterPartSelect" class="bg-[#faf8f3] border border-[#ccc4b4] rounded px-2.5 py-1 text-xs text-stone-800">
-              <option value="all">전체 부(Part 1~6)</option>
-              <option value="1">Part 1 · 기초 개념/수리</option>
-              <option value="2">Part 2 · ML/딥러닝/강화학습</option>
-              <option value="3">Part 3 · 온톨로지/지식그래프</option>
-              <option value="4">Part 4 · LLM/멀티모달</option>
-              <option value="5">Part 5 · 자율 에이전트</option>
-              <option value="6">Part 6 · MLOps/서빙</option>
-            </select>
-            <select id="indexFilterDiffSelect" class="bg-[#faf8f3] border border-[#ccc4b4] rounded px-2.5 py-1 text-xs text-stone-800">
-              <option value="all">전체 난이도(Lv.1~4)</option>
-              <option value="beginner">Lv.1 입문</option>
-              <option value="elementary">Lv.2 초급</option>
-              <option value="intermediate">Lv.3 중급</option>
-              <option value="advanced">Lv.4 심화·숙련</option>
-            </select>
-          </div>
+    <section id="view-indexgrid" class="hidden w-full max-w-6xl mx-auto px-5 sm:px-10 xl:px-16 py-8 sm:py-12 space-y-6">
+      <div class="border-b-2 border-stone-800 pb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <span class="text-xs font-mono-code font-bold uppercase tracking-widest text-[#7c5e3c]">APPENDIX E · CONCEPT &amp; GLOSSARY INDEX</span>
+          <h2 class="text-2xl sm:text-3xl font-serif-book font-bold text-stone-900 mt-1">전체 수록 개념 및 하위 용어 사전</h2>
         </div>
-        <div id="ebookItemsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Populated by JS -->
+        <div class="flex flex-wrap items-center gap-2">
+          <select id="indexFilterPartSelect" class="bg-[#faf8f3] border border-[#ccc4b4] rounded-lg px-3 py-1.5 text-xs sm:text-sm text-stone-800">
+            <option value="all">전체 부(Part 1~6)</option>
+            <option value="1">Part 1 · 기초 개념/수리</option>
+            <option value="2">Part 2 · ML/딥러닝/강화학습</option>
+            <option value="3">Part 3 · 온톨로지/지식그래프</option>
+            <option value="4">Part 4 · LLM/멀티모달</option>
+            <option value="5">Part 5 · 자율 에이전트</option>
+            <option value="6">Part 6 · MLOps/서빙</option>
+          </select>
+          <select id="indexFilterDiffSelect" class="bg-[#faf8f3] border border-[#ccc4b4] rounded-lg px-3 py-1.5 text-xs sm:text-sm text-stone-800">
+            <option value="all">전체 난이도(Lv.1~4)</option>
+            <option value="beginner">Lv.1 입문</option>
+            <option value="elementary">Lv.2 초급</option>
+            <option value="intermediate">Lv.3 중급</option>
+            <option value="advanced">Lv.4 심화·숙련</option>
+          </select>
         </div>
+      </div>
+      <div id="ebookItemsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Populated by JS -->
       </div>
     </section>
 
+    <div class="h-16 lg:hidden"></div>
   </main>
 
   <!-- ===================================================================== -->
   <!-- MOBILE BOTTOM DOCK NAVIGATION (<1024px)                               -->
   <!-- ===================================================================== -->
-  <div class="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-[#f4f1ea]/95 backdrop-blur border-t border-[#ccc4b4] px-3 py-2 flex items-center justify-between gap-2">
+  <div class="fixed bottom-0 inset-x-0 z-30 lg:hidden bg-[#f4f1ea]/95 backdrop-blur border-t border-[#ccc4b4] px-3 py-2 flex items-center justify-between gap-2">
     <button type="button" id="btnMobileGoToc" class="px-3 py-1.5 rounded text-xs font-semibold bg-[#ebe6dc] text-stone-800 border border-[#ccc4b4]">
       서문·목차
     </button>
     <button type="button" id="btnMobilePrevPage" class="px-3 py-1.5 rounded text-xs font-semibold bg-[#faf8f3] text-stone-800 border border-[#ccc4b4]">
       ← 이전
     </button>
-    <span id="mobileDockPageIndicator" class="text-[11px] font-mono-code font-semibold text-stone-700 truncate">
+    <span id="mobileDockPageIndicator" class="text-xs font-mono-code font-semibold text-stone-700 truncate">
       p.01 / 24
     </span>
     <button type="button" id="btnMobileNextPage" class="px-3 py-1.5 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100">
@@ -919,7 +898,7 @@
   </div>
 
   <!-- Toast Notification -->
-  <div id="toastBox" class="fixed bottom-16 lg:bottom-5 right-5 z-50 hidden bg-[#2c3e50] text-stone-100 text-xs font-medium px-4 py-2.5 rounded shadow-lg border border-stone-600">
+  <div id="toastBox" class="fixed bottom-16 lg:bottom-6 right-6 z-50 hidden bg-[#2c3e50] text-stone-100 text-xs sm:text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg border border-stone-600">
     저장되었습니다.
   </div>
 

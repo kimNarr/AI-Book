@@ -1,10 +1,8 @@
 // ============================================================================
 // AI-Book — AI-Book: Learning Log (Living Editorial E-Book Engine)
-// - 스마트 목차(sectionCode) 자동 정렬 및 끼워넣기 엔진
-// - 첫 표지 & 첫 페이지(인사말·프로젝트 소개·역방향 학습 애니메이션 도해)
-// - 단원별 맞춤 SVG 개념 도해 및 단계별 애니메이션 시뮬레이터
-// - 초급~심화 수준별 해설 탭 + 공부 방법 가이드 + 미니 용어 사전
-// - 6대 직군별 맞춤 로드맵 & Git 코드/마크다운 내보내기 (이모지 배제)
+// - 좌측 고정 사이드바(전체 6부작 24단원 목차 트리 + 부록) + 우측 100% 단행본 지면
+// - 탭으로 가리지 않는 서적 본문 조판 (개념 -> 대형 도판 -> 입문/중급/심화 -> 용어 -> 실습/퀴즈)
+// - 큰 글씨(14px~17px) 기반 단원별 맞춤 SVG 애니메이션 도해 엔진
 // ============================================================================
 
 (function () {
@@ -21,13 +19,10 @@
 
   let appState = {
     currentView: 'toc',          // 'toc', 'ebook', 'roles', 'architecture', 'tools', 'playbook', 'indexgrid'
-    frontMode: 'all',            // 'all' (서문+목차), 'prologue' (첫 페이지 서문·소개), 'toc' (목차만)
     selectedCoverIdx: 0,
     currentPageIdx: 0,
-    leftDepthTab: 'all',         // 'all', 'beginner', 'intermediate', 'advanced', 'study'
-    rightLabMode: 'visual',      // 'visual', 'code', 'quiz'
-    mobilePane: 'left',          // 'left' or 'right' on <1024px
     diagramAnimPaused: false,
+    desktopSidebarCollapsed: false,
     currentProcessStep: 0,
     processInterval: null,
     selectedChapter: 1,
@@ -171,7 +166,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 3. 공통 유틸리티 및 가독성 포매터
+  // 3. 공통 유틸리티 및 단행본 문단 포매터
   // --------------------------------------------------------------------------
   function stopProcessTimer() {
     if (appState.processInterval) {
@@ -179,7 +174,7 @@
       appState.processInterval = null;
     }
     const playBtn = document.getElementById('btnPlayProcess');
-    if (playBtn) playBtn.textContent = '과정 자동 재생';
+    if (playBtn) playBtn.textContent = '단계 자동 재생';
   }
 
   function showToast(msg) {
@@ -231,34 +226,35 @@
       .replace(/"/g, '&quot;');
   }
 
-  // 긴 문단을 가독성 높은 다중 문단 또는 단계별 블록으로 변환
   function formatReadableHtml(rawText) {
     if (!rawText) return '';
     const clean = String(rawText).trim();
-
-    // 화살표(→)로 이어진 단계별 학습 가이드인 경우 단계별 카드로 변환
-    if (clean.includes('→') && (clean.includes('1단계') || clean.includes('①'))) {
-      const steps = clean.split(/\s*→\s*/).filter(Boolean);
-      if (steps.length >= 2) {
-        return `<div class="space-y-2">` + steps.map((st, idx) => `
-          <div class="flex items-start gap-2.5 bg-[#f3efe6] border border-[#dcd6c8] rounded-lg px-3 py-2">
-            <span class="text-[11px] font-mono-code font-bold text-[#7c5e3c] shrink-0 mt-0.5">STEP 0${idx + 1}</span>
-            <span class="text-xs sm:text-sm text-stone-800 leading-relaxed">${escapeHtml(st.replace(/^[①②③④⑤]\s*/, ''))}</span>
-          </div>
-        `).join('') + `</div>`;
-      }
-    }
-
-    // 일반 해설 문단인 경우 2문장 단위로 호흡을 나누어 가독성 향상
     const sentences = clean.split(/(?<=\.)\s+/);
     if (sentences.length <= 2) {
-      return `<p class="leading-[1.9] text-stone-800">${escapeHtml(clean)}</p>`;
+      return `<p>${escapeHtml(clean)}</p>`;
     }
     const paragraphs = [];
     for (let i = 0; i < sentences.length; i += 2) {
       paragraphs.push(sentences.slice(i, i + 2).join(' '));
     }
-    return paragraphs.map(p => `<p class="leading-[1.9] text-stone-800">${escapeHtml(p)}</p>`).join('');
+    return paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('');
+  }
+
+  function formatStudyStepsHtml(rawGuide) {
+    if (!rawGuide) {
+      return `<p class="text-sm sm:text-base text-stone-800">1단계(비유와 정의로 개념 뼈대 잡기) → 2단계(상단 그림 도판과 4단계 애니메이션으로 데이터 흐름 확인) → 3단계(하단 실습 코드 실행 및 확인 퀴즈 풀이) 순서로 학습하세요.</p>`;
+    }
+    const clean = String(rawGuide).replace(/^\[[^\]]+\]\s*/, '').trim();
+    const steps = clean.split(/\s*→\s*/).filter(Boolean);
+    if (steps.length >= 2) {
+      return `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">` + steps.map((st, idx) => `
+        <div class="bg-[#faf8f3] border border-[#ccc4b4] rounded-xl p-4 flex items-start gap-3">
+          <span class="text-xs font-mono-code font-bold px-2 py-0.5 rounded bg-[#2c3e50] text-white shrink-0 mt-0.5">STEP 0${idx + 1}</span>
+          <span class="text-sm sm:text-[15px] text-stone-800 leading-relaxed">${escapeHtml(st.replace(/^[①②③④⑤]\s*/, ''))}</span>
+        </div>
+      `).join('') + `</div>`;
+    }
+    return `<p class="text-sm sm:text-base text-stone-800 leading-relaxed">${escapeHtml(rawGuide)}</p>`;
   }
 
   function getDifficultyMeta(diffKey) {
@@ -271,12 +267,94 @@
   }
 
   // --------------------------------------------------------------------------
-  // 4. 단원별 맞춤 그림 설명 & 애니메이션 SVG 생성 엔진
+  // 4. 좌측 고정 사이드바 목차 트리 렌더링 & 모바일 드로어 제어
+  // --------------------------------------------------------------------------
+  function closeMobileSidebar() {
+    const sb = document.getElementById('bookSidebar');
+    const bd = document.getElementById('sidebarBackdrop');
+    if (sb) sb.classList.add('-translate-x-full');
+    if (bd) bd.classList.add('hidden');
+  }
+
+  function openMobileSidebar() {
+    const sb = document.getElementById('bookSidebar');
+    const bd = document.getElementById('sidebarBackdrop');
+    if (sb) sb.classList.remove('-translate-x-full');
+    if (bd) bd.classList.remove('hidden');
+  }
+
+  function renderSidebarTree() {
+    const treeEl = document.getElementById('sidebarChapterTree');
+    const totalBadge = document.getElementById('sidebarTotalUnitsBadge');
+    const topQuick = document.getElementById('topQuickStatus');
+    if (totalBadge) totalBadge.textContent = `전 ${appState.terms.length}단원`;
+    if (topQuick) topQuick.textContent = `전 6부 ${appState.terms.length}단원 수록`;
+    if (!treeEl) return;
+
+    treeEl.innerHTML = '';
+
+    window.CHAPTERS.forEach(ch => {
+      const chTerms = [];
+      appState.terms.forEach((t, gIdx) => {
+        if (Number(t.chapter) === Number(ch.id)) {
+          chTerms.push({ termObj: t, globalIdx: gIdx });
+        }
+      });
+
+      const partBlock = document.createElement('div');
+      partBlock.className = 'space-y-1';
+
+      const partTitle = document.createElement('div');
+      partTitle.className = 'px-2.5 py-1 text-xs font-bold text-amber-300/90 flex items-center justify-between';
+      partTitle.innerHTML = `
+        <span>${escapeHtml(ch.shortLabel)}</span>
+        <span class="text-[11px] font-mono-code text-stone-400">${chTerms.length}</span>
+      `;
+      partBlock.appendChild(partTitle);
+
+      const listWrap = document.createElement('div');
+      listWrap.className = 'space-y-0.5 pl-1';
+
+      chTerms.forEach(({ termObj, globalIdx }) => {
+        const isCurrent = appState.currentView === 'ebook' && appState.currentPageIdx === globalIdx;
+        const isLearned = !!appState.learnedIds[termObj.id];
+        const secCode = termObj.sectionCode || `${ch.id}.${globalIdx + 1}`;
+        const shortName = termObj.term.split('(')[0].trim();
+
+        const itemBtn = document.createElement('button');
+        itemBtn.type = 'button';
+        itemBtn.className = 'w-full text-left px-2.5 py-1.5 rounded-lg text-xs sm:text-[13px] transition flex items-center justify-between gap-2 ' +
+          (isCurrent
+            ? 'bg-amber-400/15 text-amber-200 font-semibold border border-amber-400/40'
+            : 'text-stone-300 hover:bg-[#2a323c] hover:text-white');
+        itemBtn.innerHTML = `
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="font-mono-code text-[11px] ${isCurrent ? 'text-amber-300 font-bold' : 'text-stone-400'} shrink-0">${escapeHtml(secCode)}</span>
+            <span class="truncate">${escapeHtml(shortName)}</span>
+          </div>
+          <span class="text-[10px] font-mono-code shrink-0 ${isLearned ? 'text-emerald-400 font-bold' : 'text-stone-500'}">
+            ${isLearned ? 'DONE' : 'p.' + String(globalIdx + 1).padStart(2, '0')}
+          </span>
+        `;
+        itemBtn.addEventListener('click', () => {
+          closeMobileSidebar();
+          openBookAtPage(globalIdx);
+        });
+        listWrap.appendChild(itemBtn);
+      });
+
+      partBlock.appendChild(listWrap);
+      treeEl.appendChild(partBlock);
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // 5. 단원별 대형 그림 설명 & 애니메이션 도판 생성 엔진 (큰 글씨 14px~16px 적용)
   // --------------------------------------------------------------------------
   function buildConceptAnimatedSvg(item, stepIdx) {
     const s = Number(stepIdx) || 0;
     const id = item.id || '';
-    const sec = item.sectionCode || '1.1';
+    const sec = String(item.sectionCode || '').trim();
     const pauseClass = appState.diagramAnimPaused ? 'diagram-paused' : '';
 
     const commonDefs = `
@@ -293,382 +371,395 @@
       </defs>
     `;
 
-    // 1.1 AI 패러다임 (기호주의 규칙 트리 + 연결주의 신경망 -> 뉴로심볼릭 결합)
-    if (id === 'p1-ai-paradigm') {
+    // 1.1 AI 패러다임 (p1-paradigm / 1.1)
+    if (sec === '1.1' || id === 'p1-paradigm') {
       return `
-        <div class="${pauseClass} space-y-1.5">
-          <div class="flex items-center justify-between text-[10px] font-mono-code text-[#7c5e3c]">
-            <span>FIG ${escapeHtml(sec)} · SYMBOLIC RULES + NEURAL LEARNING = NEURO-SYMBOLIC AI</span>
-            <span>STAGE 0${s + 1} ACTIVE</span>
+        <div class="${pauseClass} space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+            <span>FIGURE ${escapeHtml(sec)} · 기호주의(논리·온톨로지) + 연결주의(신경망 학습) 하이브리드 결합</span>
+            <span>현재 단계: STEP 0${s + 1}</span>
           </div>
-          <svg viewBox="0 0 640 165" class="w-full h-auto min-w-[460px]">
+          <svg viewBox="0 0 760 220" class="w-full h-auto min-w-[560px]">
             ${commonDefs}
-            <!-- Symbolic AI Box -->
-            <rect x="14" y="16" width="175" height="58" rx="6" fill="${s === 0 ? '#2c3e50' : '#faf8f3'}" stroke="#2c3e50" stroke-width="1.6"/>
-            <text x="101" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="${s === 0 ? '#faf8f3' : '#1c1917'}">기호주의 (Symbolic AI)</text>
-            <text x="101" y="56" text-anchor="middle" font-size="9.5" fill="${s === 0 ? '#fcd34d' : '#7c5e3c'}">명시적 논리 · 규칙 · 온톨로지</text>
+            <rect x="16" y="20" width="220" height="76" rx="8" fill="${s === 0 ? '#2c3e50' : '#f3efe6'}" stroke="#2c3e50" stroke-width="2"/>
+            <text x="126" y="50" text-anchor="middle" font-size="15" font-weight="700" fill="${s === 0 ? '#ffffff' : '#1c1917'}">기호주의 (Symbolic AI)</text>
+            <text x="126" y="74" text-anchor="middle" font-size="13" fill="${s === 0 ? '#fcd34d' : '#7c5e3c'}">명시적 규칙 · 논리 · 온톨로지</text>
 
-            <!-- Connectionist AI Box -->
-            <rect x="14" y="92" width="175" height="58" rx="6" fill="${s === 1 || s === 2 ? '#2c3e50' : '#faf8f3'}" stroke="#2c3e50" stroke-width="1.6"/>
-            <text x="101" y="114" text-anchor="middle" font-size="11" font-weight="700" fill="${s === 1 || s === 2 ? '#faf8f3' : '#1c1917'}">연결주의 (Connectionism)</text>
-            <text x="101" y="132" text-anchor="middle" font-size="9.5" fill="${s === 1 || s === 2 ? '#fcd34d' : '#7c5e3c'}">머신러닝 · 딥러닝 · 강화학습</text>
+            <rect x="16" y="120" width="220" height="76" rx="8" fill="${s === 1 || s === 2 ? '#2c3e50' : '#f3efe6'}" stroke="#2c3e50" stroke-width="2"/>
+            <text x="126" y="150" text-anchor="middle" font-size="15" font-weight="700" fill="${s === 1 || s === 2 ? '#ffffff' : '#1c1917'}">연결주의 (Connectionism)</text>
+            <text x="126" y="174" text-anchor="middle" font-size="13" fill="${s === 1 || s === 2 ? '#fcd34d' : '#7c5e3c'}">머신러닝 · 딥러닝 · 강화학습</text>
 
-            <!-- Flowing paths to Hybrid Core -->
-            <path d="M 189 45 C 235 45, 240 82, 282 82" fill="none" stroke="#7c5e3c" stroke-width="2" class="svg-flow-line" marker-end="url(#arrBronze)"/>
-            <path d="M 189 121 C 235 121, 240 82, 282 82" fill="none" stroke="#2c3e50" stroke-width="2" class="svg-flow-line" marker-end="url(#arrNavy)"/>
+            <path d="M 236 58 C 285 58, 290 108, 336 108" fill="none" stroke="#7c5e3c" stroke-width="2.5" class="svg-flow-line" marker-end="url(#arrBronze)"/>
+            <path d="M 236 158 C 285 158, 290 108, 336 108" fill="none" stroke="#2c3e50" stroke-width="2.5" class="svg-flow-line" marker-end="url(#arrNavy)"/>
 
-            <!-- Hybrid Core -->
-            <rect x="288" y="46" width="165" height="74" rx="8" fill="${s === 3 ? '#2c3e50' : '#ebe6dc'}" stroke="#2c3e50" stroke-width="1.8" class="svg-pulse-node"/>
-            <text x="370" y="74" text-anchor="middle" font-size="11.5" font-weight="700" fill="${s === 3 ? '#faf8f3' : '#1c1917'}">현대 하이브리드 AI</text>
-            <text x="370" y="92" text-anchor="middle" font-size="9.5" fill="${s === 3 ? '#fcd34d' : '#57534e'}">LLM 직관 + 온톨로지 검증</text>
-            <text x="370" y="107" text-anchor="middle" font-size="9" font-family="JetBrains Mono" fill="${s === 3 ? '#e7e5e4' : '#7c5e3c'}">GraphRAG + RL + Harness</text>
+            <rect x="344" y="56" width="210" height="104" rx="10" fill="${s === 3 ? '#2c3e50' : '#ebe6dc'}" stroke="#2c3e50" stroke-width="2.2" class="svg-pulse-node"/>
+            <text x="449" y="92" text-anchor="middle" font-size="16" font-weight="700" fill="${s === 3 ? '#ffffff' : '#1c1917'}">현대 하이브리드 AI</text>
+            <text x="449" y="116" text-anchor="middle" font-size="13.5" fill="${s === 3 ? '#fcd34d' : '#44403c'}">LLM 직관 + 온톨로지 검증</text>
+            <text x="449" y="138" text-anchor="middle" font-size="12" font-family="JetBrains Mono" fill="${s === 3 ? '#e7e5e4' : '#7c5e3c'}">GraphRAG + RL + Harness</text>
 
-            <line x1="453" y1="83" x2="495" y2="83" stroke="#1f5f4b" stroke-width="2" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
+            <line x1="554" y1="108" x2="598" y2="108" stroke="#1f5f4b" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
 
-            <!-- Verified Output -->
-            <rect x="501" y="54" width="125" height="58" rx="6" fill="#faf8f3" stroke="#1f5f4b" stroke-width="1.6"/>
-            <text x="563" y="78" text-anchor="middle" font-size="11" font-weight="700" fill="#1f5f4b">신뢰성 있는 실행</text>
-            <text x="563" y="95" text-anchor="middle" font-size="9.5" fill="#44403c">환각 차단 · 근거 제시</text>
+            <rect x="606" y="66" width="138" height="84" rx="8" fill="#f3efe6" stroke="#1f5f4b" stroke-width="2"/>
+            <text x="675" y="102" text-anchor="middle" font-size="15" font-weight="700" fill="#1f5f4b">무환각 실행</text>
+            <text x="675" y="126" text-anchor="middle" font-size="13" fill="#44403c">결정론적 신뢰성</text>
           </svg>
         </div>
       `;
     }
 
-    // 1.2 토큰 & 컨텍스트 윈도우 (토큰 분할 블록 + 슬라이딩 컨텍스트 창)
-    if (id === 'p1-token-context') {
+    // 1.2 토큰과 컨텍스트 윈도우 (t1 / 1.2)
+    if (sec === '1.2' || id === 't1') {
       return `
-        <div class="${pauseClass} space-y-1.5">
-          <div class="flex items-center justify-between text-[10px] font-mono-code text-[#7c5e3c]">
-            <span>FIG ${escapeHtml(sec)} · BPE TOKENIZATION &amp; SLIDING CONTEXT WINDOW</span>
-            <span>KV CACHE ACTIVE</span>
+        <div class="${pauseClass} space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+            <span>FIGURE ${escapeHtml(sec)} · 서브워드 토큰 분해(Tokenization) 및 컨텍스트 윈도우 메모리 구조</span>
+            <span>현재 단계: STEP 0${s + 1}</span>
           </div>
-          <svg viewBox="0 0 640 165" class="w-full h-auto min-w-[460px]">
+          <svg viewBox="0 0 760 225" class="w-full h-auto min-w-[560px]">
             ${commonDefs}
-            <!-- Token Blocks -->
-            <text x="16" y="24" font-size="10" font-weight="700" fill="#57534e">01. 입력 문장의 서브워드 토큰 분할 (Tokenization)</text>
-            <rect x="16" y="34" width="76" height="36" rx="4" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.5"/>
-            <text x="54" y="50" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1c1917">"온톨로지"</text>
-            <text x="54" y="63" text-anchor="middle" font-size="8.5" font-family="JetBrains Mono" fill="#7c5e3c">ID: 48102</text>
+            <text x="18" y="28" font-size="14" font-weight="700" fill="#2c3e50">1. 입력 문장의 토큰 조각 분해 및 숫자 ID 변환</text>
 
-            <rect x="98" y="34" width="66" height="36" rx="4" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.5"/>
-            <text x="131" y="50" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1c1917">"설계"</text>
-            <text x="131" y="63" text-anchor="middle" font-size="8.5" font-family="JetBrains Mono" fill="#7c5e3c">ID: 19204</text>
+            <rect x="18" y="42" width="96" height="54" rx="6" fill="${s === 0 || s === 1 ? '#2c3e50' : '#f3efe6'}" stroke="#2c3e50" stroke-width="1.8"/>
+            <text x="66" y="66" text-anchor="middle" font-size="15" font-weight="700" fill="${s === 0 || s === 1 ? '#ffffff' : '#1c1917'}">"온톨로지"</text>
+            <text x="66" y="86" text-anchor="middle" font-size="12" font-family="JetBrains Mono" fill="${s === 0 || s === 1 ? '#fcd34d' : '#7c5e3c'}">ID: 48102</text>
 
-            <rect x="170" y="34" width="66" height="36" rx="4" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.5"/>
-            <text x="203" y="50" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1c1917">"방법론"</text>
-            <text x="203" y="63" text-anchor="middle" font-size="8.5" font-family="JetBrains Mono" fill="#7c5e3c">ID: 33091</text>
+            <rect x="122" y="42" width="86" height="54" rx="6" fill="${s === 1 || s === 2 ? '#2c3e50' : '#f3efe6'}" stroke="#2c3e50" stroke-width="1.8"/>
+            <text x="165" y="66" text-anchor="middle" font-size="15" font-weight="700" fill="${s === 1 || s === 2 ? '#ffffff' : '#1c1917'}">"설계"</text>
+            <text x="165" y="86" text-anchor="middle" font-size="12" font-family="JetBrains Mono" fill="${s === 1 || s === 2 ? '#fcd34d' : '#7c5e3c'}">ID: 19204</text>
 
-            <line x1="242" y1="52" x2="288" y2="52" stroke="#2c3e50" stroke-width="2" class="svg-flow-line" marker-end="url(#arrNavy)"/>
+            <rect x="216" y="42" width="86" height="54" rx="6" fill="${s === 2 ? '#2c3e50' : '#f3efe6'}" stroke="#2c3e50" stroke-width="1.8"/>
+            <text x="259" y="66" text-anchor="middle" font-size="15" font-weight="700" fill="${s === 2 ? '#ffffff' : '#1c1917'}">"원리"</text>
+            <text x="259" y="86" text-anchor="middle" font-size="12" font-family="JetBrains Mono" fill="${s === 2 ? '#fcd34d' : '#7c5e3c'}">ID: 33091</text>
 
-            <!-- Context Window Frame -->
-            <rect x="294" y="18" width="330" height="132" rx="8" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.8" stroke-dasharray="5 3"/>
-            <text x="310" y="38" font-size="10.5" font-weight="700" fill="#2c3e50">02. 컨텍스트 윈도우 작업대 (예: 128K ~ 2M Tokens)</text>
+            <line x1="308" y1="69" x2="358" y2="69" stroke="#7c5e3c" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
 
-            <rect x="310" y="48" width="90" height="44" rx="4" fill="#ebe6dc" stroke="#a8a29e"/>
-            <text x="355" y="67" text-anchor="middle" font-size="9.5" font-weight="700" fill="#44403c">시스템 프롬프트</text>
-            <text x="355" y="81" text-anchor="middle" font-size="8.5" fill="#78716c">고정 지시문</text>
+            <!-- Context Window Box -->
+            <rect x="366" y="18" width="376" height="188" rx="10" fill="#f3efe6" stroke="#2c3e50" stroke-width="2" stroke-dasharray="6 4"/>
+            <text x="384" y="44" font-size="14.5" font-weight="700" fill="#2c3e50">2. 컨텍스트 윈도우 작업 책상 (예: 128K ~ 2M 토큰)</text>
 
-            <rect x="408" y="48" width="102" height="44" rx="4" fill="#ebe6dc" stroke="#7c5e3c"/>
-            <text x="459" y="67" text-anchor="middle" font-size="9.5" font-weight="700" fill="#7c5e3c">RAG · 첨부 문서</text>
-            <text x="459" y="81" text-anchor="middle" font-size="8.5" fill="#57534e">KV Cache 저장</text>
+            <rect x="384" y="58" width="108" height="64" rx="6" fill="#faf8f3" stroke="#78716c" stroke-width="1.5"/>
+            <text x="438" y="84" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1c1917">시스템 지시문</text>
+            <text x="438" y="106" text-anchor="middle" font-size="12" fill="#57534e">고정 규칙</text>
 
-            <rect x="518" y="48" width="90" height="44" rx="4" fill="#2c3e50" class="svg-pulse-node"/>
-            <text x="563" y="67" text-anchor="middle" font-size="9.5" font-weight="700" fill="#faf8f3">신규 생성 토큰</text>
-            <text x="563" y="81" text-anchor="middle" font-size="8.5" fill="#fcd34d">Autoregressive</text>
+            <rect x="500" y="58" width="112" height="64" rx="6" fill="#faf8f3" stroke="#7c5e3c" stroke-width="1.5"/>
+            <text x="556" y="84" text-anchor="middle" font-size="13.5" font-weight="700" fill="#7c5e3c">첨부 문서 · 코드</text>
+            <text x="556" y="106" text-anchor="middle" font-size="12" fill="#57534e">KV 캐시 적재</text>
 
-            <!-- Memory Bar -->
-            <rect x="310" y="106" width="298" height="14" rx="7" fill="#e2ddd3"/>
-            <rect x="310" y="106" width="${130 + s * 40}" height="14" rx="7" fill="#7c5e3c"/>
-            <text x="459" y="136" text-anchor="middle" font-size="9.5" font-family="JetBrains Mono" fill="#57534e">Context Occupancy &amp; KV Cache Memory Growth</text>
+            <rect x="620" y="58" width="104" height="64" rx="6" fill="#2c3e50" class="svg-pulse-node"/>
+            <text x="672" y="84" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">신규 답변 생성</text>
+            <text x="672" y="106" text-anchor="middle" font-size="12" fill="#fcd34d">1토큰씩 출력</text>
 
-            <!-- Forgotten Tokens Warning -->
-            <rect x="16" y="92" width="220" height="56" rx="6" fill="#ebe6dc" stroke="#ccc4b4"/>
-            <text x="126" y="114" text-anchor="middle" font-size="10" font-weight="700" fill="#7c5e3c">윈도우 초과 시: 오래된 토큰 탈락</text>
-            <text x="126" y="132" text-anchor="middle" font-size="9" fill="#57534e">외부 메모리(RAG · 온톨로지)가 필요한 이유</text>
+            <!-- KV Cache Gauge -->
+            <rect x="384" y="140" width="340" height="18" rx="9" fill="#dcd6c8"/>
+            <rect x="384" y="140" width="${140 + s * 48}" height="18" rx="9" fill="#7c5e3c"/>
+            <text x="554" y="182" text-anchor="middle" font-size="13" font-weight="600" fill="#44403c">대화가 길어질수록 KV 캐시(GPU 메모리) 사용량 비례 증가</text>
+
+            <!-- Left Bottom Note -->
+            <rect x="18" y="118" width="320" height="88" rx="8" fill="#f3efe6" stroke="#ccc4b4" stroke-width="1.5"/>
+            <text x="178" y="150" text-anchor="middle" font-size="14" font-weight="700" fill="#7c5e3c">왜 컨텍스트 한계가 중요한가?</text>
+            <text x="178" y="176" text-anchor="middle" font-size="12.5" fill="#44403c">책상 넓이를 초과하면 앞부분 기억이 유실됨 → RAG·온톨로지 필수</text>
           </svg>
         </div>
       `;
     }
 
-    // 2.1 머신러닝 & 경사하강법 (손실 함수 곡선 위의 공이 기울기를 따라 내려가는 애니메이션)
-    if (id === 'p2-ml-fundamentals') {
+    // 1.3 파라미터와 체급 계산 (t2 / 1.3)
+    if (sec === '1.3' || id === 't2') {
+      return `
+        <div class="${pauseClass} space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+            <span>FIGURE ${escapeHtml(sec)} · 신경망 가중치 파라미터(Weight Matrix)와 정밀도별 VRAM 메모리 계산</span>
+            <span>현재 단계: STEP 0${s + 1}</span>
+          </div>
+          <svg viewBox="0 0 760 220" class="w-full h-auto min-w-[560px]">
+            ${commonDefs}
+            <!-- Neural Synapse Matrix -->
+            <rect x="18" y="24" width="230" height="172" rx="10" fill="#f3efe6" stroke="#2c3e50" stroke-width="2"/>
+            <text x="133" y="52" text-anchor="middle" font-size="15" font-weight="700" fill="#2c3e50">신경망 시냅스 가중치 (W)</text>
+            <circle cx="65" cy="95" r="12" fill="#2c3e50"/><circle cx="65" cy="145" r="12" fill="#2c3e50"/>
+            <circle cx="133" cy="80" r="12" fill="#7c5e3c"/><circle cx="133" cy="120" r="12" fill="#7c5e3c"/><circle cx="133" cy="160" r="12" fill="#7c5e3c"/>
+            <circle cx="200" cy="95" r="12" fill="#1f5f4b"/><circle cx="200" cy="145" r="12" fill="#1f5f4b"/>
+            <line x1="77" y1="95" x2="121" y2="80" stroke="#7c5e3c" stroke-width="2" class="svg-flow-fast"/>
+            <line x1="77" y1="95" x2="121" y2="120" stroke="#2c3e50" stroke-width="2" class="svg-flow-line"/>
+            <line x1="77" y1="145" x2="121" y2="160" stroke="#7c5e3c" stroke-width="2" class="svg-flow-fast"/>
+            <line x1="145" y1="120" x2="188" y2="95" stroke="#1f5f4b" stroke-width="2" class="svg-flow-fast"/>
+            <line x1="145" y1="120" x2="188" y2="145" stroke="#1f5f4b" stroke-width="2" class="svg-flow-line"/>
+            <text x="133" y="185" text-anchor="middle" font-size="12.5" font-weight="600" fill="#44403c">70B = 700억 개의 연결 숫자</text>
+
+            <line x1="248" y1="110" x2="296" y2="110" stroke="#2c3e50" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrNavy)"/>
+
+            <!-- VRAM Comparison Bars -->
+            <rect x="304" y="24" width="438" height="172" rx="10" fill="#f3efe6" stroke="#dcd6c8" stroke-width="2"/>
+            <text x="326" y="54" font-size="15" font-weight="700" fill="#1c1917">70B(700억 파라미터) 모델 구동에 필요한 GPU VRAM 비교</text>
+
+            <text x="326" y="88" font-size="13.5" font-weight="700" fill="#9f1239">FP16 원본 (파라미터당 2 Byte)</text>
+            <rect x="326" y="96" width="380" height="24" rx="5" fill="#9f1239"/>
+            <text x="516" y="113" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">약 140 GB VRAM 필요 (서버급 GPU 다수 필요)</text>
+
+            <text x="326" y="144" font-size="13.5" font-weight="700" fill="#1f5f4b">INT4 4-bit 양자화 (파라미터당 0.5 Byte)</text>
+            <rect x="326" y="152" width="125" height="24" rx="5" fill="#1f5f4b" class="svg-pulse-node"/>
+            <text x="466" y="169" font-size="13.5" font-weight="700" fill="#1f5f4b">→ 약 35~42 GB로 75% 압축 (로컬 구동 가능!)</text>
+          </svg>
+        </div>
+      `;
+    }
+
+    // 2.1 머신러닝 & 경사하강법 (p2-ml-fundamentals / 2.1)
+    if (sec === '2.1' || id === 'p2-ml-fundamentals') {
       const ballPositions = [
-        { cx: 115, cy: 42, label: '초기 가중치 (높은 오차 L)' },
-        { cx: 175, cy: 86, label: '기울기(미분) 방향 이동 중' },
-        { cx: 235, cy: 122, label: '오차 급감 구간 통과' },
-        { cx: 300, cy: 138, label: '최적점(Global Minimum) 수렴!' }
+        { cx: 135, cy: 52, label: 'STEP 1: 초기 가중치 (오차 큼)' },
+        { cx: 210, cy: 105, label: 'STEP 2: 미분 기울기 방향 하강' },
+        { cx: 290, cy: 152, label: 'STEP 3: 오차 급감 구간 통과' },
+        { cx: 375, cy: 172, label: 'STEP 4: 최적점(Global Minimum) 도달!' }
       ];
       const pos = ballPositions[s] || ballPositions[0];
       return `
-        <div class="${pauseClass} space-y-1.5">
-          <div class="flex items-center justify-between text-[10px] font-mono-code text-[#7c5e3c]">
-            <span>FIG ${escapeHtml(sec)} · GRADIENT DESCENT ON LOSS LANDSCAPE L(θ)</span>
+        <div class="${pauseClass} space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+            <span>FIGURE ${escapeHtml(sec)} · 손실 함수 곡선 L(θ) 위를 기울기(미분)를 따라 내려가는 경사하강법</span>
             <span>θ_new = θ - η·∇L(θ)</span>
           </div>
-          <svg viewBox="0 0 640 170" class="w-full h-auto min-w-[460px]">
+          <svg viewBox="0 0 760 225" class="w-full h-auto min-w-[560px]">
             ${commonDefs}
-            <!-- Axes -->
-            <line x1="55" y1="18" x2="55" y2="150" stroke="#78716c" stroke-width="1.5"/>
-            <line x1="55" y1="150" x2="460" y2="150" stroke="#78716c" stroke-width="1.5"/>
-            <text x="48" y="30" text-anchor="end" font-size="9.5" font-family="JetBrains Mono" fill="#57534e">Loss L</text>
-            <text x="455" y="164" text-anchor="end" font-size="9.5" font-family="JetBrains Mono" fill="#57534e">가중치 파라미터 (θ)</text>
+            <line x1="70" y1="20" x2="70" y2="190" stroke="#57534e" stroke-width="2"/>
+            <line x1="70" y1="190" x2="510" y2="190" stroke="#57534e" stroke-width="2"/>
+            <text x="60" y="36" text-anchor="end" font-size="13" font-weight="700" fill="#2c3e50">오차(Loss)</text>
+            <text x="505" y="212" text-anchor="end" font-size="13" font-weight="700" fill="#2c3e50">가중치 파라미터 (θ)</text>
 
-            <!-- Parabola Loss Curve -->
-            <path d="M 85 24 Q 300 252 435 28" fill="none" stroke="#2c3e50" stroke-width="2.5"/>
+            <path d="M 100 28 Q 375 316 500 32" fill="none" stroke="#2c3e50" stroke-width="3"/>
+            <path d="M 135 52 Q 255 162 375 172" fill="none" stroke="#7c5e3c" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
 
-            <!-- Trajectory Dashed Path -->
-            <path d="M 115 42 Q 210 130 300 138" fill="none" stroke="#7c5e3c" stroke-width="2" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
+            <circle cx="135" cy="52" r="6" fill="#d6cfc2" stroke="#78716c"/>
+            <circle cx="210" cy="105" r="6" fill="#d6cfc2" stroke="#78716c"/>
+            <circle cx="290" cy="152" r="6" fill="#d6cfc2" stroke="#78716c"/>
+            <circle cx="375" cy="172" r="7" fill="#d6cfc2" stroke="#1f5f4b"/>
 
-            <!-- Ghost steps -->
-            <circle cx="115" cy="42" r="5" fill="#d6cfc2" stroke="#78716c"/>
-            <circle cx="175" cy="86" r="5" fill="#d6cfc2" stroke="#78716c"/>
-            <circle cx="235" cy="122" r="5" fill="#d6cfc2" stroke="#78716c"/>
-            <circle cx="300" cy="138" r="6" fill="#d6cfc2" stroke="#1f5f4b" stroke-dasharray="2 2"/>
+            <circle cx="${pos.cx}" cy="${pos.cy}" r="11" fill="#7c5e3c" stroke="#ffffff" stroke-width="2.5" class="svg-pulse-node"/>
+            <rect x="${Math.max(80, pos.cx - 115)}" y="${pos.cy - 42}" width="230" height="26" rx="5" fill="#2c3e50"/>
+            <text x="${Math.max(195, pos.cx)}" y="${pos.cy - 24}" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">${pos.label}</text>
 
-            <!-- Active Rolling Ball -->
-            <circle cx="${pos.cx}" cy="${pos.cy}" r="9" fill="#7c5e3c" stroke="#faf8f3" stroke-width="2" class="svg-pulse-node"/>
-            <text x="${pos.cx}" y="${pos.cy - 14}" text-anchor="middle" font-size="10" font-weight="700" fill="#2c3e50">${pos.label}</text>
-
-            <!-- Formula & Explanation Box on Right -->
-            <rect x="475" y="24" width="150" height="122" rx="6" fill="#faf8f3" stroke="#dcd6c8"/>
-            <text x="550" y="46" text-anchor="middle" font-size="10.5" font-weight="700" fill="#2c3e50">경사하강법 4박자</text>
-            <text x="487" y="68" font-size="9.5" fill="#44403c">1. 순전파 예측값 계산</text>
-            <text x="487" y="86" font-size="9.5" fill="#44403c">2. 손실(Loss) 오차 측정</text>
-            <text x="487" y="104" font-size="9.5" fill="#7c5e3c" font-weight="700">3. 미분 기울기(∇L) 산출</text>
-            <text x="487" y="122" font-size="9.5" fill="#1f5f4b" font-weight="700">4. 학습률(η)만큼 이동</text>
+            <rect x="530" y="26" width="212" height="164" rx="10" fill="#f3efe6" stroke="#dcd6c8" stroke-width="1.8"/>
+            <text x="636" y="54" text-anchor="middle" font-size="15" font-weight="700" fill="#2c3e50">경사하강법 핵심 원리</text>
+            <text x="546" y="84" font-size="13.5" fill="#44403c">1. 현재 가중치로 예측 수행</text>
+            <text x="546" y="110" font-size="13.5" fill="#44403c">2. 정답과의 오차(Loss) 계산</text>
+            <text x="546" y="136" font-size="13.5" font-weight="700" fill="#7c5e3c">3. 미분으로 경사(∇L) 측정</text>
+            <text x="546" y="162" font-size="13.5" font-weight="700" fill="#1f5f4b">4. 경사 반대 방향으로 이동</text>
           </svg>
         </div>
       `;
     }
 
-    // 2.2 딥러닝 & 트랜스포머 Self-Attention
-    if (id === 'p2-dl-transformer') {
+    // 2.2 딥러닝 & 트랜스포머 Self-Attention (p2-dl-transformer / 2.2)
+    if (sec === '2.2' || id === 'p2-dl-transformer') {
       return `
-        <div class="${pauseClass} space-y-1.5">
-          <div class="flex items-center justify-between text-[10px] font-mono-code text-[#7c5e3c]">
-            <span>FIG ${escapeHtml(sec)} · TRANSFORMER SELF-ATTENTION (QUERY · KEY · VALUE)</span>
-            <span>PARALLEL CONTEXT MATRIX</span>
+        <div class="${pauseClass} space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+            <span>FIGURE ${escapeHtml(sec)} · 트랜스포머 Self-Attention (Query · Key · Value 문맥 연관도 계산)</span>
+            <span>현재 단계: STEP 0${s + 1}</span>
           </div>
-          <svg viewBox="0 0 640 170" class="w-full h-auto min-w-[460px]">
+          <svg viewBox="0 0 760 220" class="w-full h-auto min-w-[560px]">
             ${commonDefs}
-            <!-- Input Tokens -->
-            <rect x="18" y="22" width="92" height="30" rx="4" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.4"/>
-            <text x="64" y="41" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1c1917">"은행에"</text>
+            <rect x="18" y="24" width="120" height="42" rx="6" fill="#f3efe6" stroke="#2c3e50" stroke-width="1.8"/>
+            <text x="78" y="50" text-anchor="middle" font-size="15" font-weight="700" fill="#1c1917">"은행에"</text>
 
-            <rect x="18" y="68" width="92" height="30" rx="4" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.4"/>
-            <text x="64" y="87" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1c1917">"예금을"</text>
+            <rect x="18" y="88" width="120" height="42" rx="6" fill="#f3efe6" stroke="#7c5e3c" stroke-width="2"/>
+            <text x="78" y="114" text-anchor="middle" font-size="15" font-weight="700" fill="#7c5e3c">"예금을"</text>
 
-            <rect x="18" y="114" width="92" height="30" rx="4" fill="#2c3e50" stroke="#2c3e50" stroke-width="1.4"/>
-            <text x="64" y="133" text-anchor="middle" font-size="10.5" font-weight="700" fill="#faf8f3">"맡겼다"</text>
+            <rect x="18" y="152" width="120" height="42" rx="6" fill="#2c3e50"/>
+            <text x="78" y="178" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">"맡겼다"</text>
 
-            <!-- Attention Arcs -->
-            <path d="M 110 37 L 235 50" stroke="#7c5e3c" stroke-width="2.6" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
-            <path d="M 110 83 L 235 83" stroke="#7c5e3c" stroke-width="3.2" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
-            <path d="M 110 129 L 235 116" stroke="#2c3e50" stroke-width="2" class="svg-flow-line" marker-end="url(#arrNavy)"/>
+            <path d="M 138 45 L 275 68" stroke="#7c5e3c" stroke-width="3" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
+            <path d="M 138 109 L 275 109" stroke="#7c5e3c" stroke-width="3.5" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
+            <path d="M 138 173 L 275 150" stroke="#2c3e50" stroke-width="2.2" class="svg-flow-line" marker-end="url(#arrNavy)"/>
 
-            <!-- Q, K, V Projection Box -->
-            <rect x="242" y="26" width="165" height="114" rx="8" fill="#ebe6dc" stroke="#2c3e50" stroke-width="1.6"/>
-            <text x="324" y="47" text-anchor="middle" font-size="10.5" font-weight="700" fill="#2c3e50">Self-Attention 연산</text>
-            <rect x="256" y="56" width="40" height="24" rx="4" fill="#2c3e50"/><text x="276" y="72" text-anchor="middle" font-size="10" font-weight="700" fill="#faf8f3">Q</text>
-            <rect x="304" y="56" width="40" height="24" rx="4" fill="#7c5e3c"/><text x="324" y="72" text-anchor="middle" font-size="10" font-weight="700" fill="#faf8f3">K</text>
-            <rect x="352" y="56" width="40" height="24" rx="4" fill="#1f5f4b"/><text x="372" y="72" text-anchor="middle" font-size="10" font-weight="700" fill="#faf8f3">V</text>
-            <text x="324" y="102" text-anchor="middle" font-size="9.5" font-family="JetBrains Mono" fill="#1c1917">Softmax(Q·K^T / √d_k)·V</text>
-            <text x="324" y="124" text-anchor="middle" font-size="9" fill="#7c5e3c">문맥 연관도 가중치 결합</text>
+            <rect x="284" y="28" width="215" height="162" rx="10" fill="#f3efe6" stroke="#2c3e50" stroke-width="2"/>
+            <text x="391" y="56" text-anchor="middle" font-size="15.5" font-weight="700" fill="#2c3e50">Self-Attention 메커니즘</text>
+            <rect x="304" y="72" width="52" height="32" rx="5" fill="#2c3e50"/><text x="330" y="93" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">Q</text>
+            <rect x="365" y="72" width="52" height="32" rx="5" fill="#7c5e3c"/><text x="391" y="93" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">K</text>
+            <rect x="426" y="72" width="52" height="32" rx="5" fill="#1f5f4b"/><text x="452" y="93" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">V</text>
+            <text x="391" y="132" text-anchor="middle" font-size="13" font-family="JetBrains Mono" font-weight="600" fill="#1c1917">Softmax(Q·K^T / √d_k) · V</text>
+            <text x="391" y="160" text-anchor="middle" font-size="13" fill="#7c5e3c" font-weight="600">문장 내 모든 단어 간 관련도 계산</text>
 
-            <line x1="407" y1="83" x2="455" y2="83" stroke="#1f5f4b" stroke-width="2.2" class="svg-flow-line" marker-end="url(#arrEmerald)"/>
+            <line x1="499" y1="109" x2="548" y2="109" stroke="#1f5f4b" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
 
-            <!-- Contextualized Output -->
-            <rect x="462" y="42" width="162" height="82" rx="8" fill="#faf8f3" stroke="#1f5f4b" stroke-width="1.8" class="svg-pulse-node"/>
-            <text x="543" y="68" text-anchor="middle" font-size="11" font-weight="700" fill="#1f5f4b">문맥이 반영된 표현 벡터</text>
-            <text x="543" y="88" text-anchor="middle" font-size="9.5" fill="#44403c">"은행" = 금융기관 (97.2%)</text>
-            <text x="543" y="106" text-anchor="middle" font-size="9" fill="#78716c">(식물 은행나무 2.8% 배제)</text>
+            <rect x="556" y="42" width="186" height="134" rx="10" fill="#2c3e50" class="svg-pulse-node"/>
+            <text x="649" y="78" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">문맥 파악 완료</text>
+            <text x="649" y="108" text-anchor="middle" font-size="14" font-weight="700" fill="#fcd34d">"은행" = 금융기관 (97%)</text>
+            <text x="649" y="136" text-anchor="middle" font-size="12.5" fill="#e7e5e4">"예금"과의 강한 어텐션으로</text>
+            <text x="649" y="156" text-anchor="middle" font-size="12.5" fill="#e7e5e4">동음이의어 모호성 완벽 해결</text>
           </svg>
         </div>
       `;
     }
 
-    // 2.3 강화학습 (MDP · 정책 경사 · PPO & GRPO 루프)
-    if (id === 'p2-rl-mdp-grpo') {
+    // 2.3 강화학습 (p2-reinforcement-learning / 2.3)
+    if (sec === '2.3' || id === 'p2-reinforcement-learning') {
       return `
-        <div class="${pauseClass} space-y-1.5">
-          <div class="flex items-center justify-between text-[10px] font-mono-code text-[#7c5e3c]">
-            <span>FIG ${escapeHtml(sec)} · REINFORCEMENT LEARNING LOOP (MDP &amp; GRPO GROUP ADVANTAGE)</span>
-            <span>POLICY π_θ UPDATE</span>
+        <div class="${pauseClass} space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+            <span>FIGURE ${escapeHtml(sec)} · 강화학습(MDP · PPO · GRPO) 상태-행동-보상 피드백 루프</span>
+            <span>현재 단계: STEP 0${s + 1}</span>
           </div>
-          <svg viewBox="0 0 640 172" class="w-full h-auto min-w-[460px]">
+          <svg viewBox="0 0 760 220" class="w-full h-auto min-w-[560px]">
             ${commonDefs}
-            <!-- Agent Box -->
-            <rect x="24" y="46" width="165" height="78" rx="8" fill="#2c3e50" stroke="#1c1917" stroke-width="1.6" class="svg-pulse-node"/>
-            <text x="106" y="74" text-anchor="middle" font-size="11.5" font-weight="700" fill="#faf8f3">에이전트 (Agent)</text>
-            <text x="106" y="93" text-anchor="middle" font-size="9.5" fill="#fcd34d">정책 신경망 π_θ (s_t)</text>
-            <text x="106" y="110" text-anchor="middle" font-size="8.5" font-family="JetBrains Mono" fill="#e7e5e4">GRPO: G개 추론 경로 생성</text>
+            <rect x="24" y="54" width="215" height="110" rx="10" fill="#2c3e50" class="svg-pulse-node"/>
+            <text x="131" y="90" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">에이전트 (Agent)</text>
+            <text x="131" y="116" text-anchor="middle" font-size="13.5" fill="#fcd34d">정책 신경망 π_θ (s_t)</text>
+            <text x="131" y="142" text-anchor="middle" font-size="12.5" fill="#e7e5e4">GRPO: 여러 추론 답안 동시 생성</text>
 
-            <!-- Top Action Arrow -->
-            <path d="M 189 64 Q 310 18 426 64" fill="none" stroke="#2c3e50" stroke-width="2.2" class="svg-flow-fast" marker-end="url(#arrNavy)"/>
-            <rect x="240" y="18" width="140" height="22" rx="4" fill="#faf8f3" stroke="#ccc4b4"/>
-            <text x="310" y="33" text-anchor="middle" font-size="10" font-weight="700" fill="#2c3e50">행동 / 추론 토큰 (a_t)</text>
+            <path d="M 239 78 Q 380 18 512 78" fill="none" stroke="#2c3e50" stroke-width="2.8" class="svg-flow-fast" marker-end="url(#arrNavy)"/>
+            <rect x="285" y="16" width="190" height="32" rx="6" fill="#f3efe6" stroke="#2c3e50" stroke-width="1.5"/>
+            <text x="380" y="37" text-anchor="middle" font-size="14" font-weight="700" fill="#2c3e50">행동 선택 · 추론 과정 (a_t)</text>
 
-            <!-- Environment / Verifier Box -->
-            <rect x="432" y="46" width="184" height="78" rx="8" fill="#faf8f3" stroke="#7c5e3c" stroke-width="1.8"/>
-            <text x="524" y="72" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1c1917">환경 · 검증기 (Environment)</text>
-            <text x="524" y="91" text-anchor="middle" font-size="9.5" fill="#7c5e3c">컴파일러 · 수학 정답 · 시뮬레이터</text>
-            <text x="524" y="108" text-anchor="middle" font-size="9" fill="#1f5f4b" font-weight="700">상대 이득 A_i = (r_i - μ) / σ</text>
+            <rect x="520" y="54" width="216" height="110" rx="10" fill="#f3efe6" stroke="#7c5e3c" stroke-width="2.2"/>
+            <text x="628" y="90" text-anchor="middle" font-size="16" font-weight="700" fill="#1c1917">환경 · 검증기 (Verifier)</text>
+            <text x="628" y="116" text-anchor="middle" font-size="13.5" fill="#7c5e3c">코드 테스트 · 수학 정답 채점</text>
+            <text x="628" y="142" text-anchor="middle" font-size="13" font-weight="700" fill="#1f5f4b">그룹 상대 이득 A_i = (r_i - μ)/σ</text>
 
-            <!-- Bottom State + Reward Arrow -->
-            <path d="M 432 108 Q 310 156 193 108" fill="none" stroke="#7c5e3c" stroke-width="2.2" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
-            <rect x="215" y="128" width="190" height="24" rx="4" fill="#f3efe6" stroke="#7c5e3c"/>
-            <text x="310" y="144" text-anchor="middle" font-size="10" font-weight="700" fill="#7c5e3c">다음 상태 (s_t+1) + 보상 신호 (Reward r_t)</text>
+            <path d="M 520 142 Q 380 204 245 142" fill="none" stroke="#7c5e3c" stroke-width="2.8" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
+            <rect x="260" y="166" width="240" height="34" rx="6" fill="#f3efe6" stroke="#7c5e3c" stroke-width="1.5"/>
+            <text x="380" y="188" text-anchor="middle" font-size="14" font-weight="700" fill="#7c5e3c">다음 상태(s_t+1) + 보상 점수(Reward r_t)</text>
           </svg>
         </div>
       `;
     }
 
-    // 3.1 온톨로지 (Class · Property · Axiom · Reasoner)
-    if (id === 'p3-ontology-core') {
+    // 3.1 온톨로지 (p3-ontology-core / 3.1)
+    if (sec === '3.1' || id === 'p3-ontology-core') {
       return `
-        <div class="${pauseClass} space-y-1.5">
-          <div class="flex items-center justify-between text-[10px] font-mono-code text-[#7c5e3c]">
-            <span>FIG ${escapeHtml(sec)} · ONTOLOGY ARCHITECTURE (CLASS · PROPERTY · AXIOM · REASONER)</span>
-            <span>OWL / SEMANTIC SCHEMA</span>
+        <div class="${pauseClass} space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+            <span>FIGURE ${escapeHtml(sec)} · 온톨로지 4대 구성요소 (Class · Property · Axiom · Reasoner 추론기)</span>
+            <span>현재 단계: STEP 0${s + 1}</span>
           </div>
-          <svg viewBox="0 0 640 176" class="w-full h-auto min-w-[480px]">
+          <svg viewBox="0 0 760 225" class="w-full h-auto min-w-[560px]">
             ${commonDefs}
-            <!-- Class Hierarchy (TBox) -->
-            <rect x="16" y="16" width="130" height="34" rx="5" fill="#2c3e50"/>
-            <text x="81" y="37" text-anchor="middle" font-size="10.5" font-weight="700" fill="#faf8f3">Class: 임직원</text>
+            <rect x="18" y="18" width="170" height="44" rx="6" fill="#2c3e50"/>
+            <text x="103" y="45" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">상위 클래스: 임직원</text>
 
-            <line x1="50" y1="50" x2="50" y2="76" stroke="#2c3e50" stroke-width="1.5"/>
-            <line x1="112" y1="50" x2="112" y2="76" stroke="#2c3e50" stroke-width="1.5"/>
+            <line x1="60" y1="62" x2="60" y2="94" stroke="#2c3e50" stroke-width="2"/>
+            <line x1="146" y1="62" x2="146" y2="94" stroke="#2c3e50" stroke-width="2"/>
 
-            <rect x="12" y="76" width="76" height="32" rx="4" fill="#faf8f3" stroke="#1f5f4b" stroke-width="1.6"/>
-            <text x="50" y="96" text-anchor="middle" font-size="10" font-weight="700" fill="#1f5f4b">정직원</text>
+            <rect x="14" y="94" width="92" height="42" rx="6" fill="#f3efe6" stroke="#1f5f4b" stroke-width="2"/>
+            <text x="60" y="120" text-anchor="middle" font-size="14" font-weight="700" fill="#1f5f4b">정직원</text>
 
-            <rect x="96" y="76" width="76" height="32" rx="4" fill="#faf8f3" stroke="#7c5e3c" stroke-width="1.6"/>
-            <text x="134" y="96" text-anchor="middle" font-size="10" font-weight="700" fill="#7c5e3c">인턴</text>
+            <rect x="114" y="94" width="92" height="42" rx="6" fill="#f3efe6" stroke="#7c5e3c" stroke-width="2"/>
+            <text x="160" y="120" text-anchor="middle" font-size="14" font-weight="700" fill="#7c5e3c">인턴</text>
 
-            <!-- Disjoint Axiom -->
-            <rect x="22" y="122" width="140" height="28" rx="4" fill="#ebe6dc" stroke="#7c5e3c" stroke-dasharray="3 2"/>
-            <text x="92" y="140" text-anchor="middle" font-size="9.5" font-weight="700" fill="#7c5e3c">공리(Axiom): 상호배타(Disjoint)</text>
+            <rect x="18" y="152" width="188" height="42" rx="6" fill="#ebe6dc" stroke="#7c5e3c" stroke-width="1.8" stroke-dasharray="4 3"/>
+            <text x="112" y="178" text-anchor="middle" font-size="13" font-weight="700" fill="#7c5e3c">공리(Axiom): 상호배타(Disjoint)</text>
 
-            <!-- Object Property Relation -->
-            <line x1="88" y1="92" x2="262" y2="54" stroke="#1f5f4b" stroke-width="2" class="svg-flow-line" marker-end="url(#arrEmerald)"/>
-            <rect x="148" y="42" width="102" height="20" rx="3" fill="#faf8f3" stroke="#1f5f4b"/>
-            <text x="199" y="55" text-anchor="middle" font-size="9" font-weight="700" fill="#1f5f4b">열람가능(Property)</text>
+            <line x1="106" y1="115" x2="306" y2="62" stroke="#1f5f4b" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
+            <rect x="172" y="52" width="124" height="28" rx="5" fill="#faf8f3" stroke="#1f5f4b" stroke-width="1.5"/>
+            <text x="234" y="71" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f5f4b">열람권한(Property)</text>
 
-            <!-- Target Resource Class -->
-            <rect x="268" y="32" width="136" height="44" rx="6" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.6"/>
-            <text x="336" y="52" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1c1917">Class: 1급 기밀문서</text>
-            <text x="336" y="67" text-anchor="middle" font-size="9" fill="#7c5e3c">ONLY 정직원 접근 허용</text>
+            <rect x="314" y="30" width="176" height="62" rx="8" fill="#f3efe6" stroke="#2c3e50" stroke-width="2"/>
+            <text x="402" y="58" text-anchor="middle" font-size="15" font-weight="700" fill="#1c1917">클래스: 1급 기밀문서</text>
+            <text x="402" y="80" text-anchor="middle" font-size="12.5" fill="#7c5e3c" font-weight="600">ONLY 정직원 접근 허용</text>
 
-            <!-- Reasoner Engine -->
-            <rect x="256" y="102" width="160" height="52" rx="6" fill="#2c3e50" class="svg-pulse-node"/>
-            <text x="336" y="124" text-anchor="middle" font-size="10.5" font-weight="700" fill="#faf8f3">추론기 (OWL Reasoner)</text>
-            <text x="336" y="141" text-anchor="middle" font-size="9" fill="#fcd34d">숨은 관계 도출 · 모순 자동 차단</text>
+            <rect x="304" y="118" width="196" height="76" rx="8" fill="#2c3e50" class="svg-pulse-node"/>
+            <text x="402" y="150" text-anchor="middle" font-size="15.5" font-weight="700" fill="#ffffff">추론기 (OWL Reasoner)</text>
+            <text x="402" y="174" text-anchor="middle" font-size="13" fill="#fcd34d">숨은 관계 도출 · 규칙 위반 차단</text>
 
-            <line x1="416" y1="128" x2="462" y2="128" stroke="#2c3e50" stroke-width="2" class="svg-flow-fast" marker-end="url(#arrNavy)"/>
+            <line x1="500" y1="156" x2="546" y2="156" stroke="#2c3e50" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrNavy)"/>
 
-            <!-- Verified Grounding for LLM -->
-            <rect x="468" y="36" width="156" height="118" rx="8" fill="#faf8f3" stroke="#1f5f4b" stroke-width="1.6"/>
-            <text x="546" y="60" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1f5f4b">결정론적 무결성 보장</text>
-            <text x="546" y="82" text-anchor="middle" font-size="9.5" fill="#44403c">[OK] 정직원 → 열람 승인</text>
-            <text x="546" y="102" text-anchor="middle" font-size="9.5" fill="#9f1239" font-weight="700">[차단] 인턴 → 공리 위반</text>
-            <text x="546" y="128" text-anchor="middle" font-size="9" fill="#78716c">LLM 에이전트의 행동 가드레일</text>
+            <rect x="554" y="34" width="188" height="160" rx="10" fill="#f3efe6" stroke="#1f5f4b" stroke-width="2"/>
+            <text x="648" y="68" text-anchor="middle" font-size="15" font-weight="700" fill="#1f5f4b">온톨로지 검증 결과</text>
+            <text x="648" y="102" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1c1917">[승인] 정직원 → 열람 가능</text>
+            <text x="648" y="132" text-anchor="middle" font-size="13.5" font-weight="700" fill="#9f1239">[차단] 인턴 → 공리 위반!</text>
+            <text x="648" y="166" text-anchor="middle" font-size="12.5" fill="#57534e">LLM 환각에 의존하지 않는</text>
+            <text x="648" y="184" text-anchor="middle" font-size="12.5" fill="#57534e">결정론적 기업 지식 설계도</text>
           </svg>
         </div>
       `;
     }
 
-    // 3.2 지식 그래프 (RDF Triple & Property Graph Multi-hop) || 3.3 임베딩 & GraphRAG
-    if (id === 'p3-knowledge-graph' || id === 'p3-embedding-graphrag') {
+    // 3.2 지식 그래프 & 3.3 임베딩/GraphRAG (3.2, 3.3)
+    if (sec === '3.2' || sec === '3.3' || id === 'p3-knowledge-graph' || id === 'p3-graphrag-embedding') {
       return `
-        <div class="${pauseClass} space-y-1.5">
-          <div class="flex items-center justify-between text-[10px] font-mono-code text-[#7c5e3c]">
-            <span>FIG ${escapeHtml(sec)} · KNOWLEDGE GRAPH TRIPLES &amp; HYBRID GRAPHRAG TRAVERSAL</span>
-            <span>MULTI-HOP REASONING</span>
+        <div class="${pauseClass} space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+            <span>FIGURE ${escapeHtml(sec)} · 지식 그래프 다중 홉(Multi-hop) 관계 추론과 하이브리드 GraphRAG</span>
+            <span>현재 단계: STEP 0${s + 1}</span>
           </div>
-          <svg viewBox="0 0 640 172" class="w-full h-auto min-w-[460px]">
+          <svg viewBox="0 0 760 220" class="w-full h-auto min-w-[560px]">
             ${commonDefs}
-            <!-- Top Channel: Vector Similarity -->
-            <rect x="16" y="18" width="185" height="54" rx="6" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.5"/>
-            <text x="108" y="40" text-anchor="middle" font-size="10.5" font-weight="700" fill="#2c3e50">1. 벡터 임베딩 공간 (Vector DB)</text>
-            <text x="108" y="57" text-anchor="middle" font-size="9" fill="#57534e">코사인 유사도로 진입 노드 탐색</text>
+            <rect x="18" y="20" width="235" height="68" rx="8" fill="#f3efe6" stroke="#2c3e50" stroke-width="1.8"/>
+            <text x="135" y="48" text-anchor="middle" font-size="15" font-weight="700" fill="#2c3e50">1. 벡터 임베딩 검색 (Vector DB)</text>
+            <text x="135" y="72" text-anchor="middle" font-size="13" fill="#57534e">의미 유사도로 시작 개체(Node) 탐색</text>
 
-            <!-- Bottom Channel: Knowledge Graph Multi-hop -->
-            <circle cx="52" cy="128" r="24" fill="#2c3e50"/>
-            <text x="52" y="125" text-anchor="middle" font-size="9.5" font-weight="700" fill="#faf8f3">부품 A</text>
-            <text x="52" y="138" text-anchor="middle" font-size="8" fill="#fcd34d">Subject</text>
+            <!-- Multi-hop nodes -->
+            <rect x="18" y="122" width="110" height="68" rx="8" fill="#2c3e50"/>
+            <text x="73" y="152" text-anchor="middle" font-size="14.5" font-weight="700" fill="#ffffff">장애 부품 A</text>
+            <text x="73" y="174" text-anchor="middle" font-size="12" fill="#fcd34d">주어 (Subject)</text>
 
-            <line x1="76" y1="128" x2="146" y2="128" stroke="#7c5e3c" stroke-width="2" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
-            <text x="111" y="118" text-anchor="middle" font-size="8.5" font-weight="700" fill="#7c5e3c">탑재됨(1-Hop)</text>
+            <line x1="128" y1="156" x2="196" y2="156" stroke="#7c5e3c" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
+            <text x="162" y="144" text-anchor="middle" font-size="12" font-weight="700" fill="#7c5e3c">탑재됨(1-Hop)</text>
 
-            <circle cx="174" cy="128" r="24" fill="#faf8f3" stroke="#7c5e3c" stroke-width="1.8"/>
-            <text x="174" y="125" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1c1917">모듈 B</text>
-            <text x="174" y="138" text-anchor="middle" font-size="8" fill="#7c5e3c">Object</text>
+            <rect x="202" y="122" width="110" height="68" rx="8" fill="#f3efe6" stroke="#7c5e3c" stroke-width="2"/>
+            <text x="257" y="152" text-anchor="middle" font-size="14.5" font-weight="700" fill="#1c1917">결제 모듈 B</text>
+            <text x="257" y="174" text-anchor="middle" font-size="12" fill="#7c5e3c">매개 노드</text>
 
-            <line x1="198" y1="128" x2="268" y2="128" stroke="#7c5e3c" stroke-width="2" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
-            <text x="233" y="118" text-anchor="middle" font-size="8.5" font-weight="700" fill="#7c5e3c">책임팀(2-Hop)</text>
+            <line x1="312" y1="156" x2="380" y2="156" stroke="#7c5e3c" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
+            <text x="346" y="144" text-anchor="middle" font-size="12" font-weight="700" fill="#7c5e3c">담당팀(2-Hop)</text>
 
-            <circle cx="296" cy="128" r="24" fill="#faf8f3" stroke="#1f5f4b" stroke-width="1.8" class="svg-pulse-node"/>
-            <text x="296" y="125" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1f5f4b">보안팀 C</text>
-            <text x="296" y="138" text-anchor="middle" font-size="8" fill="#57534e">Target</text>
+            <rect x="386" y="122" width="114" height="68" rx="8" fill="#f3efe6" stroke="#1f5f4b" stroke-width="2.2" class="svg-pulse-node"/>
+            <text x="443" y="152" text-anchor="middle" font-size="14.5" font-weight="700" fill="#1f5f4b">보안인프라팀</text>
+            <text x="443" y="174" text-anchor="middle" font-size="12" fill="#44403c">최종 타겟 도출</text>
 
-            <!-- Merge into Hybrid GraphRAG Context -->
-            <path d="M 201 45 C 310 45, 340 76, 396 76" fill="none" stroke="#2c3e50" stroke-width="1.8" class="svg-flow-line" marker-end="url(#arrNavy)"/>
-            <path d="M 320 128 C 360 128, 365 92, 396 92" fill="none" stroke="#1f5f4b" stroke-width="2" class="svg-flow-line" marker-end="url(#arrEmerald)"/>
+            <path d="M 253 54 C 380 54, 440 88, 526 88" fill="none" stroke="#2c3e50" stroke-width="2.2" class="svg-flow-line" marker-end="url(#arrNavy)"/>
+            <path d="M 500 156 C 515 156, 515 125, 526 125" fill="none" stroke="#1f5f4b" stroke-width="2.2" class="svg-flow-line" marker-end="url(#arrEmerald)"/>
 
-            <rect x="404" y="42" width="218" height="90" rx="8" fill="#2c3e50"/>
-            <text x="513" y="68" text-anchor="middle" font-size="11" font-weight="700" fill="#faf8f3">Hybrid GraphRAG 컨텍스트 결합</text>
-            <text x="513" y="88" text-anchor="middle" font-size="9.5" fill="#fcd34d">비정형 문맥 + 다중 홉(Multi-hop) 관계망</text>
-            <text x="513" y="108" text-anchor="middle" font-size="9" fill="#e7e5e4">복합 인과관계 질문에 무환각 답변 생성</text>
+            <rect x="534" y="42" width="208" height="148" rx="10" fill="#2c3e50"/>
+            <text x="638" y="82" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">Hybrid GraphRAG</text>
+            <text x="638" y="112" text-anchor="middle" font-size="13.5" fill="#fcd34d">벡터 문맥 + 그래프 관계 경로</text>
+            <text x="638" y="142" text-anchor="middle" font-size="12.5" fill="#e7e5e4">단순 문서 검색이 못 찾는</text>
+            <text x="638" y="164" text-anchor="middle" font-size="12.5" fill="#e7e5e4">다중 인과관계를 정확히 추론</text>
           </svg>
         </div>
       `;
     }
 
-    // Part 4 (LLM · MoE · LoRA · 루프 트랜스포머 · System 1)
+    // Part 4 (LLM · 멀티모달 · MoE · 루프 트랜스포머 · System 1)
     if (Number(item.chapter) === 4) {
       return `
-        <div class="${pauseClass} space-y-1.5">
-          <div class="flex items-center justify-between text-[10px] font-mono-code text-[#7c5e3c]">
-            <span>FIG ${escapeHtml(sec)} · NEXT-GEN LLM ARCHITECTURE (SPARSE MOE &amp; DYNAMIC ROUTING)</span>
-            <span>SELECTIVE COMPUTE</span>
+        <div class="${pauseClass} space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+            <span>FIGURE ${escapeHtml(sec)} · 차세대 LLM 신경망 아키텍처 (선택적 전문가 라우팅 &amp; 고효율 추론)</span>
+            <span>현재 단계: STEP 0${s + 1}</span>
           </div>
-          <svg viewBox="0 0 640 170" class="w-full h-auto min-w-[460px]">
+          <svg viewBox="0 0 760 220" class="w-full h-auto min-w-[560px]">
             ${commonDefs}
-            <!-- Input Token & Shared Context -->
-            <rect x="16" y="54" width="120" height="62" rx="6" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.6"/>
-            <text x="76" y="80" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1c1917">입력 토큰 &amp; 문맥</text>
-            <text x="76" y="98" text-anchor="middle" font-size="9" fill="#7c5e3c">프리필 압축 / 임베딩</text>
+            <rect x="18" y="62" width="150" height="96" rx="8" fill="#f3efe6" stroke="#2c3e50" stroke-width="2"/>
+            <text x="93" y="102" text-anchor="middle" font-size="15" font-weight="700" fill="#1c1917">입력 프롬프트</text>
+            <text x="93" y="128" text-anchor="middle" font-size="13" fill="#7c5e3c">텍스트 · 이미지 · 음성</text>
 
-            <line x1="136" y1="85" x2="184" y2="85" stroke="#2c3e50" stroke-width="2" class="svg-flow-line" marker-end="url(#arrNavy)"/>
+            <line x1="168" y1="110" x2="222" y2="110" stroke="#2c3e50" stroke-width="2.5" class="svg-flow-line" marker-end="url(#arrNavy)"/>
 
-            <!-- Router Gate -->
-            <rect x="190" y="48" width="110" height="74" rx="8" fill="#2c3e50" class="svg-pulse-node"/>
-            <text x="245" y="78" text-anchor="middle" font-size="10.5" font-weight="700" fill="#faf8f3">라우터 / 제어부</text>
-            <text x="245" y="96" text-anchor="middle" font-size="9" fill="#fcd34d">Top-K 전문가 선택</text>
+            <rect x="230" y="54" width="150" height="112" rx="10" fill="#2c3e50" class="svg-pulse-node"/>
+            <text x="305" y="96" text-anchor="middle" font-size="15.5" font-weight="700" fill="#ffffff">라우터 / 제어 게이트</text>
+            <text x="305" y="122" text-anchor="middle" font-size="13" fill="#fcd34d">필요한 전문가·경로만</text>
+            <text x="305" y="142" text-anchor="middle" font-size="13" fill="#fcd34d">실시간 선택 활성화</text>
 
-            <!-- Expert Paths -->
-            <path d="M 300 68 L 368 36" stroke="#1f5f4b" stroke-width="2.2" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
-            <path d="M 300 85 L 368 85" stroke="#ccc4b4" stroke-width="1.2" stroke-dasharray="3 3"/>
-            <path d="M 300 102 L 368 134" stroke="#7c5e3c" stroke-width="2.2" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
+            <path d="M 380 82 L 446 44" stroke="#1f5f4b" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
+            <path d="M 380 110 L 446 110" stroke="#ccc4b4" stroke-width="1.8" stroke-dasharray="4 4"/>
+            <path d="M 380 138 L 446 176" stroke="#7c5e3c" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrBronze)"/>
 
-            <!-- Experts -->
-            <rect x="374" y="16" width="128" height="38" rx="5" fill="#faf8f3" stroke="#1f5f4b" stroke-width="1.8"/>
-            <text x="438" y="39" text-anchor="middle" font-size="10" font-weight="700" fill="#1f5f4b">활성 전문가 #1 (ON)</text>
+            <rect x="454" y="20" width="150" height="48" rx="6" fill="#f3efe6" stroke="#1f5f4b" stroke-width="2"/>
+            <text x="529" y="49" text-anchor="middle" font-size="14" font-weight="700" fill="#1f5f4b">활성 전문가 A (ON)</text>
 
-            <rect x="374" y="66" width="128" height="38" rx="5" fill="#ebe6dc" stroke="#ccc4b4"/>
-            <text x="438" y="89" text-anchor="middle" font-size="10" fill="#78716c">비활성 전문가 #2 (OFF)</text>
+            <rect x="454" y="86" width="150" height="48" rx="6" fill="#ebe6dc" stroke="#ccc4b4"/>
+            <text x="529" y="115" text-anchor="middle" font-size="13.5" fill="#78716c">휴면 전문가 B (절전)</text>
 
-            <rect x="374" y="116" width="128" height="38" rx="5" fill="#faf8f3" stroke="#7c5e3c" stroke-width="1.8"/>
-            <text x="438" y="139" text-anchor="middle" font-size="10" font-weight="700" fill="#7c5e3c">활성 전문가 #3 (ON)</text>
+            <rect x="454" y="152" width="150" height="48" rx="6" fill="#f3efe6" stroke="#7c5e3c" stroke-width="2"/>
+            <text x="529" y="181" text-anchor="middle" font-size="14" font-weight="700" fill="#7c5e3c">활성 전문가 C (ON)</text>
 
-            <path d="M 502 35 L 542 74" stroke="#1f5f4b" stroke-width="1.8" class="svg-flow-line"/>
-            <path d="M 502 135 L 542 96" stroke="#7c5e3c" stroke-width="1.8" class="svg-flow-line"/>
+            <path d="M 604 44 L 638 92" stroke="#1f5f4b" stroke-width="2" class="svg-flow-line"/>
+            <path d="M 604 176 L 638 128" stroke="#7c5e3c" stroke-width="2" class="svg-flow-line"/>
 
-            <!-- Final Output -->
-            <rect x="544" y="54" width="82" height="62" rx="6" fill="#2c3e50"/>
-            <text x="585" y="80" text-anchor="middle" font-size="10" font-weight="700" fill="#faf8f3">고효율 추론</text>
-            <text x="585" y="97" text-anchor="middle" font-size="8.5" fill="#fcd34d">비용 80% 절감</text>
+            <rect x="640" y="62" width="104" height="96" rx="8" fill="#2c3e50"/>
+            <text x="692" y="102" text-anchor="middle" font-size="14.5" font-weight="700" fill="#ffffff">초고속 출력</text>
+            <text x="692" y="128" text-anchor="middle" font-size="12.5" fill="#fcd34d">연산비 대폭 절감</text>
           </svg>
         </div>
       `;
@@ -677,52 +768,47 @@
     // Part 5 (자율 에이전트 하네스 · MCP · A2A · 체화된 에이전트 · 증류/RSI)
     if (Number(item.chapter) === 5) {
       return `
-        <div class="${pauseClass} space-y-1.5">
-          <div class="flex items-center justify-between text-[10px] font-mono-code text-[#7c5e3c]">
-            <span>FIG ${escapeHtml(sec)} · AGENTIC HARNESS &amp; MCP UNIVERSAL TOOL PROTOCOL</span>
-            <span>OBSERVE → PLAN → ACT → VERIFY</span>
+        <div class="${pauseClass} space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+            <span>FIGURE ${escapeHtml(sec)} · 에이전틱 하네스(Harness) 및 MCP / A2A 표준 프로토콜 아키텍처</span>
+            <span>현재 단계: STEP 0${s + 1}</span>
           </div>
-          <svg viewBox="0 0 640 172" class="w-full h-auto min-w-[460px]">
+          <svg viewBox="0 0 760 220" class="w-full h-auto min-w-[560px]">
             ${commonDefs}
-            <!-- Persistent Memory -->
-            <rect x="16" y="22" width="142" height="52" rx="6" fill="#faf8f3" stroke="#7c5e3c" stroke-width="1.6"/>
-            <text x="87" y="45" text-anchor="middle" font-size="10.5" font-weight="700" fill="#7c5e3c">영구 메모리 &amp; 스킬북</text>
-            <text x="87" y="61" text-anchor="middle" font-size="9" fill="#57534e">세션 간 노하우 보존</text>
+            <rect x="18" y="24" width="175" height="72" rx="8" fill="#f3efe6" stroke="#7c5e3c" stroke-width="2"/>
+            <text x="105" y="54" text-anchor="middle" font-size="14.5" font-weight="700" fill="#7c5e3c">영구 메모리 &amp; 스킬북</text>
+            <text x="105" y="78" text-anchor="middle" font-size="12.5" fill="#44403c">세션 간 경험·지식 보존</text>
 
-            <!-- Goal & Scheduler -->
-            <rect x="16" y="96" width="142" height="52" rx="6" fill="#faf8f3" stroke="#2c3e50" stroke-width="1.6"/>
-            <text x="87" y="119" text-anchor="middle" font-size="10.5" font-weight="700" fill="#2c3e50">목표 &amp; 상태 감시 루프</text>
-            <text x="87" y="135" text-anchor="middle" font-size="9" fill="#57534e">24시간 자율 스케줄러</text>
+            <rect x="18" y="122" width="175" height="72" rx="8" fill="#f3efe6" stroke="#2c3e50" stroke-width="2"/>
+            <text x="105" y="152" text-anchor="middle" font-size="14.5" font-weight="700" fill="#2c3e50">목표 관리 &amp; 스케줄러</text>
+            <text x="105" y="176" text-anchor="middle" font-size="12.5" fill="#44403c">24시간 상시 작업 루프</text>
 
-            <line x1="158" y1="48" x2="218" y2="72" stroke="#7c5e3c" stroke-width="1.8" class="svg-flow-line" marker-end="url(#arrBronze)"/>
-            <line x1="158" y1="122" x2="218" y2="98" stroke="#2c3e50" stroke-width="1.8" class="svg-flow-line" marker-end="url(#arrNavy)"/>
+            <line x1="193" y1="60" x2="262" y2="92" stroke="#7c5e3c" stroke-width="2.2" class="svg-flow-line" marker-end="url(#arrBronze)"/>
+            <line x1="193" y1="158" x2="262" y2="126" stroke="#2c3e50" stroke-width="2.2" class="svg-flow-line" marker-end="url(#arrNavy)"/>
 
-            <!-- Central Harness Core -->
-            <rect x="224" y="42" width="170" height="86" rx="8" fill="#2c3e50" class="svg-pulse-node"/>
-            <text x="309" y="70" text-anchor="middle" font-size="11.5" font-weight="700" fill="#faf8f3">에이전틱 하네스 (Harness)</text>
-            <text x="309" y="89" text-anchor="middle" font-size="9.5" fill="#fcd34d">LLM 두뇌 + 오류 자기 복구</text>
-            <text x="309" y="108" text-anchor="middle" font-size="9" font-family="JetBrains Mono" fill="#e7e5e4">MCP / A2A Standard Bus</text>
+            <rect x="270" y="48" width="205" height="122" rx="10" fill="#2c3e50" class="svg-pulse-node"/>
+            <text x="372" y="86" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">에이전틱 하네스 본체</text>
+            <text x="372" y="114" text-anchor="middle" font-size="13.5" fill="#fcd34d">관찰 → 계획 → 실행 → 자기검증</text>
+            <text x="372" y="142" text-anchor="middle" font-size="12.5" font-family="JetBrains Mono" fill="#e7e5e4">MCP / A2A Standard Bus</text>
 
-            <!-- MCP Connections -->
-            <line x1="394" y1="62" x2="458" y2="38" stroke="#1f5f4b" stroke-width="2" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
-            <line x1="394" y1="85" x2="458" y2="85" stroke="#1f5f4b" stroke-width="2" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
-            <line x1="394" y1="108" x2="458" y2="132" stroke="#1f5f4b" stroke-width="2" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
+            <line x1="475" y1="80" x2="546" y2="44" stroke="#1f5f4b" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
+            <line x1="475" y1="109" x2="546" y2="109" stroke="#1f5f4b" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
+            <line x1="475" y1="138" x2="546" y2="174" stroke="#1f5f4b" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrEmerald)"/>
 
-            <!-- External Tools -->
-            <rect x="464" y="16" width="160" height="38" rx="5" fill="#faf8f3" stroke="#1f5f4b" stroke-width="1.5"/>
-            <text x="544" y="39" text-anchor="middle" font-size="10" font-weight="700" fill="#1c1917">MCP 도구: 터미널 · Git · DB</text>
+            <rect x="554" y="18" width="188" height="50" rx="6" fill="#f3efe6" stroke="#1f5f4b" stroke-width="1.8"/>
+            <text x="648" y="48" text-anchor="middle" font-size="14" font-weight="700" fill="#1c1917">MCP 도구 (터미널·DB·웹)</text>
 
-            <rect x="464" y="66" width="160" height="38" rx="5" fill="#faf8f3" stroke="#1f5f4b" stroke-width="1.5"/>
-            <text x="544" y="89" text-anchor="middle" font-size="10" font-weight="700" fill="#1c1917">가상 환경 API (Mineflayer)</text>
+            <rect x="554" y="84" width="188" height="50" rx="6" fill="#f3efe6" stroke="#1f5f4b" stroke-width="1.8"/>
+            <text x="648" y="114" text-anchor="middle" font-size="14" font-weight="700" fill="#1c1917">물리·가상 환경 제어 API</text>
 
-            <rect x="464" y="116" width="160" height="38" rx="5" fill="#faf8f3" stroke="#1f5f4b" stroke-width="1.5"/>
-            <text x="544" y="139" text-anchor="middle" font-size="10" font-weight="700" fill="#1c1917">동료 에이전트 협업 (A2A)</text>
+            <rect x="554" y="150" width="188" height="50" rx="6" fill="#f3efe6" stroke="#1f5f4b" stroke-width="1.8"/>
+            <text x="648" y="180" text-anchor="middle" font-size="14" font-weight="700" fill="#1c1917">동료 에이전트 협업 (A2A)</text>
           </svg>
         </div>
       `;
     }
 
-    // Default / Part 1.3 & Part 6 (파라미터 · 양자화 압축 · vLLM 서빙 · 벤치마크)
+    // Part 6 및 기타 단원 (양자화 · vLLM · 오픈웨이트 · 벤치마크 · 신규 단원)
     const steps = item.processSteps || [
       { title: '1단계', nodes: ['입력 데이터'] },
       { title: '2단계', nodes: ['핵심 처리'] },
@@ -732,37 +818,37 @@
     const labels = steps.map((st, idx) => (st.nodes && st.nodes[0]) ? st.nodes[0] : `단계 0${idx + 1}`);
 
     return `
-      <div class="${pauseClass} space-y-1.5">
-        <div class="flex items-center justify-between text-[10px] font-mono-code text-[#7c5e3c]">
-          <span>FIG ${escapeHtml(sec)} · CONCEPTUAL ARCHITECTURE &amp; DATA FLOW SCHEMATIC</span>
-          <span>ACTIVE STAGE 0${s + 1}</span>
+      <div class="${pauseClass} space-y-2">
+        <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
+          <span>FIGURE ${escapeHtml(sec)} · 핵심 엔지니어링 파이프라인 및 데이터 흐름도</span>
+          <span>현재 활성 단계: STEP 0${s + 1}</span>
         </div>
-        <svg viewBox="0 0 640 155" class="w-full h-auto min-w-[460px]">
+        <svg viewBox="0 0 760 205" class="w-full h-auto min-w-[560px]">
           ${commonDefs}
           ${[0, 1, 2, 3].map(idx => {
-            const x = 16 + idx * 156;
+            const x = 18 + idx * 184;
             const isCur = idx === s;
             const lbl = labels[idx] || `STAGE 0${idx + 1}`;
             return `
-              <rect x="${x}" y="34" width="132" height="76" rx="7"
-                fill="${isCur ? '#2c3e50' : '#faf8f3'}"
+              <rect x="${x}" y="32" width="158" height="96" rx="9"
+                fill="${isCur ? '#2c3e50' : '#f3efe6'}"
                 stroke="${isCur ? '#1c1917' : '#2c3e50'}"
-                stroke-width="${isCur ? '2' : '1.4'}"
+                stroke-width="${isCur ? '2.5' : '1.8'}"
                 class="${isCur ? 'svg-pulse-node' : ''}"/>
-              <text x="${x + 66}" y="58" text-anchor="middle" font-size="9.5" font-family="JetBrains Mono" font-weight="700" fill="${isCur ? '#fcd34d' : '#7c5e3c'}">STAGE 0${idx + 1}</text>
-              <text x="${x + 66}" y="82" text-anchor="middle" font-size="10.5" font-weight="700" fill="${isCur ? '#faf8f3' : '#1c1917'}">${escapeHtml(lbl.slice(0, 12))}</text>
-              ${idx < 3 ? `<line x1="${x + 132}" y1="72" x2="${x + 154}" y2="72" stroke="#7c5e3c" stroke-width="2" class="svg-flow-fast" marker-end="url(#arrBronze)"/>` : ''}
+              <text x="${x + 79}" y="64" text-anchor="middle" font-size="12.5" font-family="JetBrains Mono" font-weight="700" fill="${isCur ? '#fcd34d' : '#7c5e3c'}">STAGE 0${idx + 1}</text>
+              <text x="${x + 79}" y="96" text-anchor="middle" font-size="14.5" font-weight="700" fill="${isCur ? '#ffffff' : '#1c1917'}">${escapeHtml(lbl.slice(0, 11))}</text>
+              ${idx < 3 ? `<line x1="${x + 158}" y1="80" x2="${x + 182}" y2="80" stroke="#7c5e3c" stroke-width="2.5" class="svg-flow-fast" marker-end="url(#arrBronze)"/>` : ''}
             `;
           }).join('')}
-          <path d="M 560 110 Q 320 148 82 110" fill="none" stroke="#2c3e50" stroke-width="1.4" class="svg-flow-line" marker-end="url(#arrNavy)"/>
-          <text x="320" y="142" text-anchor="middle" font-size="9" font-family="JetBrains Mono" fill="#57534e">CONTINUOUS FEEDBACK &amp; VERIFICATION LOOP</text>
+          <path d="M 670 128 Q 380 185 95 128" fill="none" stroke="#2c3e50" stroke-width="2" class="svg-flow-line" marker-end="url(#arrNavy)"/>
+          <text x="380" y="182" text-anchor="middle" font-size="12.5" font-family="JetBrains Mono" font-weight="600" fill="#44403c">CONTINUOUS VERIFICATION &amp; OPTIMIZATION LOOP</text>
         </svg>
       </div>
     `;
   }
 
   // --------------------------------------------------------------------------
-  // 5. 상단 진도율 바 렌더링
+  // 6. 상단/사이드바 진도율 렌더링
   // --------------------------------------------------------------------------
   function renderProgress() {
     const total = appState.terms.length;
@@ -776,38 +862,14 @@
     if (bar) bar.style.width = pct + '%';
     if (txt) txt.textContent = `${pct}% (${learnedCount}/${total} 완독 · 퀴즈 ${quizCount})`;
     if (coverStats) coverStats.textContent = `전 ${window.CHAPTERS.length}부 ${total}단원 수록`;
+    renderSidebarTree();
   }
 
   // --------------------------------------------------------------------------
-  // 6. VIEW 0: 첫 표지 · 첫 페이지(인사말·소개) · 마스터 목차 렌더링
+  // 7. VIEW 0: 첫 표지 · 첫 페이지(인사말·소개) · 마스터 목차 렌더링
   // --------------------------------------------------------------------------
-  function updateFrontPageModeUI() {
-    const prologueSec = document.getElementById('frontPrologueSection');
-    const tocSec = document.getElementById('frontTocSection');
-    if (prologueSec && tocSec) {
-      if (appState.frontMode === 'prologue') {
-        prologueSec.classList.remove('hidden');
-        tocSec.classList.add('hidden');
-      } else if (appState.frontMode === 'toc') {
-        prologueSec.classList.add('hidden');
-        tocSec.classList.remove('hidden');
-      } else {
-        prologueSec.classList.remove('hidden');
-        tocSec.classList.remove('hidden');
-      }
-    }
-
-    document.querySelectorAll('.front-mode-btn').forEach(btn => {
-      const m = btn.getAttribute('data-frontmode');
-      btn.className = m === appState.frontMode
-        ? 'front-mode-btn px-2.5 py-1 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 transition'
-        : 'front-mode-btn px-2.5 py-1 rounded text-xs font-medium text-stone-700 hover:bg-stone-300/60 transition';
-    });
-  }
-
   function renderTocView() {
     renderProgress();
-    updateFrontPageModeUI();
 
     const coverObj = window.COVER_DESIGNS[appState.selectedCoverIdx] || window.COVER_DESIGNS[0];
     const mainImg = document.getElementById('coverMainImg');
@@ -835,19 +897,19 @@
 
         const box = document.createElement('button');
         box.type = 'button';
-        box.className = 'text-left p-3 rounded-lg bg-[#f3efe6] hover:bg-[#eae4d7] border border-[#dcd6c8] transition flex flex-col justify-between group';
+        box.className = 'text-left p-5 rounded-xl bg-[#f3efe6] hover:bg-[#eae4d7] border border-[#dcd6c8] transition flex flex-col justify-between group shadow-sm';
         box.innerHTML = `
           <div>
-            <div class="flex items-center justify-between text-[11px] font-semibold text-[#7c5e3c]">
+            <div class="flex items-center justify-between text-xs font-mono-code font-bold text-[#7c5e3c]">
               <span>${escapeHtml(ch.badge)}</span>
-              <span class="font-mono-code">${escapeHtml(pageRange)}</span>
+              <span>${escapeHtml(pageRange)}</span>
             </div>
-            <div class="text-xs sm:text-sm font-serif-book font-bold text-stone-900 mt-1 group-hover:text-[#2c3e50]">${escapeHtml(ch.title)}</div>
-            <p class="text-[11px] text-stone-600 mt-0.5 line-clamp-1">${escapeHtml(ch.subtitle)}</p>
+            <div class="text-base sm:text-lg font-serif-book font-bold text-stone-900 mt-1.5 group-hover:text-[#2c3e50]">${escapeHtml(ch.title)}</div>
+            <p class="text-xs sm:text-sm text-stone-600 mt-1.5 leading-relaxed">${escapeHtml(ch.subtitle)}</p>
           </div>
-          <div class="mt-2 pt-1.5 border-t border-[#e2ddd3] flex items-center justify-between text-[11px]">
-            <span class="text-stone-500">${escapeHtml(ch.targetLevel || '')}</span>
-            <span class="font-semibold text-[#2c3e50]">단원 ${chTerms.length}개 펼치기 →</span>
+          <div class="mt-4 pt-2.5 border-t border-[#e2ddd3] flex items-center justify-between text-xs">
+            <span class="text-stone-500 font-medium">${escapeHtml(ch.targetLevel || '')}</span>
+            <span class="font-bold text-[#2c3e50]">단원 ${chTerms.length}개 읽기 →</span>
           </div>
         `;
         box.addEventListener('click', () => {
@@ -861,8 +923,8 @@
     document.querySelectorAll('.toc-diff-btn').forEach(btn => {
       const d = btn.getAttribute('data-tocdiff');
       btn.className = d === appState.tocFilterDiff
-        ? 'toc-diff-btn px-2.5 py-1 rounded text-[11px] font-semibold bg-[#2c3e50] text-stone-100 transition'
-        : 'toc-diff-btn px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300 transition';
+        ? 'toc-diff-btn px-3 py-1.5 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 transition'
+        : 'toc-diff-btn px-3 py-1.5 rounded text-xs font-medium bg-[#faf8f3] text-stone-700 border border-[#ccc4b4] hover:bg-stone-200 transition';
     });
 
     // 세부 단원 차례 리스트
@@ -881,14 +943,14 @@
       if (matchingTerms.length === 0) return;
 
       const partWrap = document.createElement('div');
-      partWrap.className = 'space-y-1.5';
+      partWrap.className = 'space-y-2';
 
       const pageRange = getChapterPageRange(ch.id);
       const header = document.createElement('div');
-      header.className = 'text-xs font-serif-book font-bold text-stone-800 border-b border-[#e2ddd3] pb-1 flex items-center justify-between';
+      header.className = 'text-sm sm:text-base font-serif-book font-bold text-stone-900 border-b border-[#ccc4b4] pb-1.5 flex items-center justify-between';
       header.innerHTML = `
         <span>${escapeHtml(ch.badge)} — ${escapeHtml(ch.title)}</span>
-        <span class="text-[11px] font-mono-code font-normal text-stone-500">${escapeHtml(pageRange)}</span>
+        <span class="text-xs font-mono-code font-normal text-stone-500">${escapeHtml(pageRange)}</span>
       `;
       partWrap.appendChild(header);
 
@@ -902,19 +964,19 @@
 
         const row = document.createElement('button');
         row.type = 'button';
-        row.className = 'w-full text-left py-1.5 px-2 rounded hover:bg-[#f0ece1] transition flex items-baseline justify-between gap-2 group';
+        row.className = 'w-full text-left py-2 px-3 rounded-lg hover:bg-[#eae4d7] transition flex items-baseline justify-between gap-2 group';
         row.innerHTML = `
-          <div class="flex items-baseline gap-2 min-w-0">
-            <span class="text-[11px] font-mono-code font-semibold text-[#7c5e3c] shrink-0">[${escapeHtml(secCode)}]</span>
-            <span class="text-xs sm:text-sm font-medium text-stone-800 group-hover:text-[#2c3e50] truncate">${escapeHtml(item.term)}</span>
-            <span class="text-[10px] px-1.5 py-0.2 rounded border ${diffMeta.colorClass} shrink-0 hidden sm:inline-block">${diffMeta.badge}</span>
-            ${isLearned ? '<span class="text-[10px] px-1.5 py-0.2 rounded bg-stone-800 text-stone-100 shrink-0">완독</span>' : ''}
-            ${isQuizPassed ? '<span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-800 text-stone-100 shrink-0">퀴즈통과</span>' : ''}
-            ${isBookmarked ? '<span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-200 text-amber-950 shrink-0">책갈피</span>' : ''}
-            ${item.isCustom ? '<span class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-900 border border-indigo-300 shrink-0">신규수록</span>' : ''}
+          <div class="flex items-baseline gap-2.5 min-w-0">
+            <span class="text-xs sm:text-sm font-mono-code font-bold text-[#7c5e3c] shrink-0">[${escapeHtml(secCode)}]</span>
+            <span class="text-sm sm:text-base font-medium text-stone-900 group-hover:text-[#2c3e50] truncate">${escapeHtml(item.term)}</span>
+            <span class="text-xs px-2 py-0.5 rounded border ${diffMeta.colorClass} shrink-0 hidden sm:inline-block">${diffMeta.badge}</span>
+            ${isLearned ? '<span class="text-xs px-2 py-0.5 rounded bg-stone-800 text-stone-100 shrink-0">완독</span>' : ''}
+            ${isQuizPassed ? '<span class="text-xs px-2 py-0.5 rounded bg-emerald-800 text-stone-100 shrink-0">퀴즈통과</span>' : ''}
+            ${isBookmarked ? '<span class="text-xs px-2 py-0.5 rounded bg-amber-200 text-amber-950 shrink-0">책갈피</span>' : ''}
+            ${item.isCustom ? '<span class="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-900 border border-indigo-300 shrink-0">신규수록</span>' : ''}
           </div>
-          <div class="flex-1 border-b border-dotted border-stone-300 mx-1 min-w-[16px]"></div>
-          <span class="text-xs font-serif-book font-semibold text-stone-600 shrink-0">p. ${pageNumStr}</span>
+          <div class="flex-1 border-b border-dotted border-stone-400 mx-2 min-w-[20px]"></div>
+          <span class="text-xs sm:text-sm font-serif-book font-bold text-stone-700 shrink-0">p. ${pageNumStr}</span>
         `;
         row.addEventListener('click', () => {
           openBookAtPage(globalIdx);
@@ -930,36 +992,14 @@
     stopProcessTimer();
     appState.currentPageIdx = Math.max(0, Math.min(pageIdx, appState.terms.length - 1));
     appState.currentProcessStep = 0;
-    appState.mobilePane = 'left';
     switchMainView('ebook');
   }
 
   // --------------------------------------------------------------------------
-  // 7. VIEW 1: 본문 읽기 (양면 스프레드 & 모바일 탭 리더)
+  // 8. VIEW 1: 단행본 본문 챕터 리더 렌더링 (가독성 최우선 대형 레이아웃)
   // --------------------------------------------------------------------------
-  function updateMobilePaneVisibility() {
-    const leftPane = document.getElementById('bookLeftPagePane');
-    const rightPane = document.getElementById('bookRightPagePane');
-    const btnMobLeft = document.getElementById('btnMobilePaneLeft');
-    const btnMobRight = document.getElementById('btnMobilePaneRight');
-    if (!leftPane || !rightPane) return;
-
-    if (appState.mobilePane === 'left') {
-      leftPane.classList.remove('mobile-pane-hidden');
-      rightPane.classList.add('mobile-pane-hidden');
-      if (btnMobLeft) btnMobLeft.className = 'flex-1 py-2 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 transition';
-      if (btnMobRight) btnMobRight.className = 'flex-1 py-2 rounded text-xs font-medium text-stone-700 hover:bg-stone-200 transition';
-    } else {
-      leftPane.classList.add('mobile-pane-hidden');
-      rightPane.classList.remove('mobile-pane-hidden');
-      if (btnMobRight) btnMobRight.className = 'flex-1 py-2 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 transition';
-      if (btnMobLeft) btnMobLeft.className = 'flex-1 py-2 rounded text-xs font-medium text-stone-700 hover:bg-stone-200 transition';
-    }
-  }
-
   function renderBookSpreadView() {
     renderProgress();
-    updateMobilePaneVisibility();
 
     const totalPages = appState.terms.length;
     if (totalPages === 0) return;
@@ -970,47 +1010,6 @@
     const currentChapter = window.CHAPTERS.find(c => Number(c.id) === Number(currentItem.chapter)) || window.CHAPTERS[0];
     appState.selectedChapter = currentChapter.id;
 
-    // 상단 파트 점프 버튼 바
-    const partBar = document.getElementById('chapterCardsContainer');
-    if (partBar) {
-      partBar.innerHTML = '';
-      window.CHAPTERS.forEach(ch => {
-        const isCurrentPart = Number(ch.id) === Number(currentItem.chapter);
-        const firstIdx = appState.terms.findIndex(t => Number(t.chapter) === Number(ch.id));
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'px-2.5 py-1 rounded text-xs font-semibold transition ' +
-          (isCurrentPart
-            ? 'bg-[#2c3e50] text-stone-100'
-            : 'bg-[#faf8f3] text-stone-700 hover:bg-stone-200 border border-[#ccc4b4]');
-        btn.textContent = ch.shortLabel;
-        btn.addEventListener('click', () => {
-          if (firstIdx >= 0) {
-            appState.currentPageIdx = firstIdx;
-            appState.currentProcessStep = 0;
-            triggerPageFlipAnimation();
-            renderBookSpreadView();
-          }
-        });
-        partBar.appendChild(btn);
-      });
-    }
-
-    // 페이지 바로가기 셀렉트 박스
-    const selectEl = document.getElementById('pageJumpSelect');
-    if (selectEl) {
-      selectEl.innerHTML = '';
-      appState.terms.forEach((t, idx) => {
-        const opt = document.createElement('option');
-        opt.value = String(idx);
-        const sec = t.sectionCode || `${t.chapter}.${idx + 1}`;
-        opt.textContent = `p.${String(idx + 1).padStart(2, '0')} [${sec}] ${t.term.slice(0, 24)}`;
-        if (idx === appState.currentPageIdx) opt.selected = true;
-        selectEl.appendChild(opt);
-      });
-    }
-
-    // 왼쪽 페이지 헤더 및 메타 정보
     const pageNumStr = String(appState.currentPageIdx + 1).padStart(2, '0');
     const secCodeStr = currentItem.sectionCode || `${currentChapter.id}.1`;
     const diffMeta = getDifficultyMeta(currentItem.difficulty);
@@ -1018,27 +1017,59 @@
 
     document.getElementById('leftPagePartHeader').textContent = `${currentChapter.badge} — ${currentChapter.title}`;
     document.getElementById('leftPageLayerBtn').textContent = `${currentItem.layer} · ${layerObj.name.replace(' 계층', '')}`;
-    document.getElementById('leftPageSectionNum').textContent = `SECTION ${secCodeStr} · PAGE ${pageNumStr} OF ${String(totalPages).padStart(2, '0')}`;
+    document.getElementById('leftPageSectionNum').textContent = `CHAPTER ${secCodeStr} · PAGE ${pageNumStr} OF ${String(totalPages).padStart(2, '0')}`;
 
     const diffBadgeEl = document.getElementById('leftPageDifficultyBadge');
     if (diffBadgeEl) {
-      diffBadgeEl.className = `text-[11px] font-semibold px-2.5 py-0.5 rounded border ${diffMeta.colorClass}`;
+      diffBadgeEl.className = `text-xs font-semibold px-3 py-1 rounded border ${diffMeta.colorClass}`;
       diffBadgeEl.textContent = diffMeta.label;
     }
 
     document.getElementById('leftPageTitle').textContent = currentItem.term;
     document.getElementById('leftPageAnalogy').textContent = currentItem.analogy;
 
-    // 왼쪽 페이지: 단원별 개념 구조 애니메이션 도해 렌더링
-    const leftDiagramBox = document.getElementById('leftPageConceptDiagramBox');
-    if (leftDiagramBox) {
-      leftDiagramBox.innerHTML = buildConceptAnimatedSvg(currentItem, appState.currentProcessStep);
+    // 제1절: 본문 상세 해설 및 실무 노트
+    document.getElementById('leftPageDefinition').innerHTML = formatReadableHtml(currentItem.definition);
+    document.getElementById('leftPageDeepNote').innerHTML = formatReadableHtml(
+      currentItem.deepNote || `실무 요약: 이 개념은 ${layerObj.name}에서 핵심적인 역할을 담당합니다.`
+    );
+
+    // 제3절: 탭으로 숨기지 않고 입문 / 중급 / 심화 3단계를 한눈에 읽는 카드 + 공부 순서
+    const multiDepthEl = document.getElementById('multiDepthCardsContainer');
+    if (multiDepthEl) {
+      const lv = currentItem.levels || {};
+      const begText = lv.beginner || currentItem.analogy;
+      const intText = lv.intermediate || currentItem.definition;
+      const advText = lv.advanced || currentItem.deepNote || currentItem.definition;
+
+      multiDepthEl.innerHTML = `
+        <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-5 space-y-2.5 flex flex-col justify-between">
+          <div class="space-y-2">
+            <span class="inline-block text-xs font-mono-code font-bold px-2.5 py-1 rounded bg-emerald-900/10 text-emerald-900 border border-emerald-800/30">STEP 1 · Lv.1 입문 개념</span>
+            <p class="text-sm sm:text-[15px] text-stone-800 leading-[1.85]">${escapeHtml(begText.replace(/^입문\s*개념:\s*/, ''))}</p>
+          </div>
+        </div>
+        <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-5 space-y-2.5 flex flex-col justify-between">
+          <div class="space-y-2">
+            <span class="inline-block text-xs font-mono-code font-bold px-2.5 py-1 rounded bg-amber-900/15 text-amber-950 border border-amber-800/40">STEP 2 · Lv.3 중급 원리</span>
+            <p class="text-sm sm:text-[15px] text-stone-800 leading-[1.85]">${escapeHtml(intText.replace(/^중급\s*원리:\s*/, ''))}</p>
+          </div>
+        </div>
+        <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-5 space-y-2.5 flex flex-col justify-between">
+          <div class="space-y-2">
+            <span class="inline-block text-xs font-mono-code font-bold px-2.5 py-1 rounded bg-rose-900/15 text-rose-950 border border-rose-800/40">STEP 3 · Lv.4 심화 엔지니어링</span>
+            <p class="text-sm sm:text-[15px] text-stone-800 leading-[1.85]">${escapeHtml(advText.replace(/^심화\s*엔지니어링:\s*/, ''))}</p>
+          </div>
+        </div>
+      `;
     }
 
-    // 수준별 깊이 학습 탭 렌더링
-    renderLeftDepthContent(currentItem, layerObj);
+    const studyOrderEl = document.getElementById('studyOrderStepsContainer');
+    if (studyOrderEl) {
+      studyOrderEl.innerHTML = formatStudyStepsHtml(currentItem.studyGuide);
+    }
 
-    // 핵심 용어 미니 사전 (keyTerms) 렌더링
+    // 제4절: 핵심 용어 미니 사전 (keyTerms) — 큰 글씨 적용
     const glossaryBox = document.getElementById('leftPageKeyTermsBox');
     const glossaryList = document.getElementById('leftPageKeyTermsList');
     if (glossaryBox && glossaryList) {
@@ -1046,12 +1077,12 @@
       if (kTerms.length > 0) {
         glossaryBox.classList.remove('hidden');
         glossaryList.innerHTML = kTerms.map((kt, idx) => `
-          <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-lg p-3">
-            <div class="flex items-center gap-1.5">
-              <span class="text-[10px] font-mono-code font-bold text-[#7c5e3c]">0${idx + 1}</span>
-              <span class="text-xs font-bold text-[#2c3e50]">${escapeHtml(kt.term)}</span>
+          <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-4 sm:p-5 space-y-1.5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono-code font-bold px-2 py-0.5 rounded bg-[#ebe6dc] text-[#7c5e3c]">TERM 0${idx + 1}</span>
+              <h3 class="text-base font-serif-book font-bold text-[#2c3e50]">${escapeHtml(kt.term)}</h3>
             </div>
-            <div class="text-xs text-stone-700 mt-1 leading-relaxed">${escapeHtml(kt.desc)}</div>
+            <p class="text-sm sm:text-[15px] text-stone-700 leading-[1.8] pt-0.5">${escapeHtml(kt.desc)}</p>
           </div>
         `).join('');
       } else {
@@ -1059,7 +1090,7 @@
       }
     }
 
-    // 추천 직군 배지 & 연계 도구 렌더링 (이모지 제거)
+    // 추천 직군 배지 & 연계 도구 렌더링
     const rolesContainer = document.getElementById('leftPageRolesContainer');
     if (rolesContainer) {
       rolesContainer.innerHTML = '';
@@ -1068,7 +1099,7 @@
         if (!rMeta) return;
         const badge = document.createElement('button');
         badge.type = 'button';
-        badge.className = 'text-[11px] font-semibold px-2.5 py-1 rounded bg-[#f4f0e6] hover:bg-[#e6dfd1] text-[#7c5e3c] border border-[#d6cfc2] transition';
+        badge.className = 'text-xs font-semibold px-3 py-1 rounded-lg bg-[#f3efe6] hover:bg-[#e6dfd1] text-[#7c5e3c] border border-[#d6cfc2] transition';
         badge.textContent = `[${rMeta.code}] ${rMeta.shortName} 트랙 →`;
         badge.addEventListener('click', () => {
           appState.selectedRole = rMeta.id;
@@ -1084,7 +1115,7 @@
       (currentItem.relatedTools || []).forEach(toolLabel => {
         const chip = document.createElement('button');
         chip.type = 'button';
-        chip.className = 'text-xs font-medium px-2.5 py-1 rounded bg-[#ebe6dc] hover:bg-[#dfd9cc] text-stone-800 border border-[#ccc4b4] transition';
+        chip.className = 'text-xs sm:text-sm font-medium px-3 py-1 rounded-lg bg-[#ebe6dc] hover:bg-[#dfd9cc] text-stone-800 border border-[#ccc4b4] transition';
         chip.textContent = toolLabel + ' →';
         chip.addEventListener('click', () => {
           const cleanName = toolLabel.split('(')[0].trim();
@@ -1097,9 +1128,8 @@
       });
     }
 
-    // 하단 페이지 번호 및 상태 버튼
-    document.getElementById('leftPageNumber').textContent = `p. ${pageNumStr} [${secCodeStr} 개념·도해편]`;
-    document.getElementById('rightPageNumber').textContent = `p. ${pageNumStr} [${secCodeStr} 실습·퀴즈]`;
+    // 하단 페이지 번호 및 이전/다음 단원 제목 표시
+    document.getElementById('leftPageNumber').textContent = `Page ${pageNumStr} of ${String(totalPages).padStart(2, '0')} · [${secCodeStr}]`;
 
     const mobIndicator = document.getElementById('mobileDockPageIndicator');
     if (mobIndicator) {
@@ -1112,64 +1142,45 @@
     const bmBtn = document.getElementById('btnToggleBookmark');
     if (bmBtn) {
       bmBtn.textContent = isBookmarked ? '[책갈피 설정됨]' : '책갈피 추가';
-      bmBtn.className = 'px-3 py-1 rounded text-xs font-medium border transition ' +
+      bmBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium border transition ' +
         (isBookmarked ? 'bg-amber-900/15 border-amber-800/50 text-amber-950 font-semibold' : 'border-[#ccc4b4] bg-[#f3efe6] text-stone-700 hover:bg-stone-200');
     }
 
     const learnBtn = document.getElementById('btnToggleLearned');
     if (learnBtn) {
-      learnBtn.textContent = isLearned ? '[완독 완료]' : '학습 완료 표시';
-      learnBtn.className = 'px-3 py-1 rounded text-xs font-semibold border transition ' +
-        (isLearned ? 'bg-stone-800 border-stone-800 text-stone-100' : 'border-[#2c3e50] bg-[#faf8f3] text-[#2c3e50] hover:bg-stone-200');
+      learnBtn.textContent = isLearned ? '[완독 완료됨]' : '학습 완료 표시';
+      learnBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold border transition ' +
+        (isLearned ? 'bg-emerald-800 border-emerald-800 text-white' : 'border-[#2c3e50] bg-[#2c3e50] text-white hover:bg-[#1e2b38]');
     }
 
-    // 이전/다음 페이지 버튼
+    // 이전/다음 단원 하단 카드 업데이트
     const prevBtn = document.getElementById('btnPrevPage');
-    const nextBtn = document.getElementById('btnNextPage');
-    if (prevBtn) {
-      prevBtn.disabled = appState.currentPageIdx === 0;
-      prevBtn.className = 'px-3.5 py-1.5 rounded text-xs font-semibold border transition ' +
-        (appState.currentPageIdx === 0 ? 'bg-stone-200 text-stone-400 border-stone-300 cursor-not-allowed' : 'bg-[#ebe6dc] hover:bg-[#dfd9cc] text-stone-800 border-[#ccc4b4]');
-    }
-    if (nextBtn) {
-      nextBtn.textContent = appState.currentPageIdx === totalPages - 1 ? '서문·목차로 돌아가기' : '다음 페이지 →';
+    const prevLbl = document.getElementById('prevChapterLabel');
+    const nextLbl = document.getElementById('nextChapterLabel');
+
+    if (prevBtn && prevLbl) {
+      if (appState.currentPageIdx > 0) {
+        const prevItem = appState.terms[appState.currentPageIdx - 1];
+        prevBtn.disabled = false;
+        prevBtn.className = 'flex-1 text-left p-4 rounded-xl bg-[#f3efe6] hover:bg-[#eae4d7] border border-[#ccc4b4] transition';
+        prevLbl.textContent = `[${prevItem.sectionCode}] ${prevItem.term}`;
+      } else {
+        prevBtn.disabled = false;
+        prevLbl.textContent = '00. 첫 표지 · 여는 글 (서문)으로 이동';
+      }
     }
 
-    // 오른쪽 페이지 렌더링 (Visual / Code / Quiz)
+    if (nextLbl) {
+      if (appState.currentPageIdx < totalPages - 1) {
+        const nextItem = appState.terms[appState.currentPageIdx + 1];
+        nextLbl.textContent = `[${nextItem.sectionCode}] ${nextItem.term}`;
+      } else {
+        nextLbl.textContent = '전체 목차(서문)로 돌아가기';
+      }
+    }
+
+    // 제2절 대형 애니메이션 도판 및 제5절 코드·퀴즈 렌더링
     renderRightLabPage(currentItem);
-  }
-
-  function renderLeftDepthContent(item, layerObj) {
-    document.querySelectorAll('.left-depth-tab').forEach(btn => {
-      const tab = btn.getAttribute('data-depthtab');
-      btn.className = tab === appState.leftDepthTab
-        ? 'left-depth-tab px-2.5 py-1 rounded text-[11px] font-semibold bg-[#2c3e50] text-stone-100 transition'
-        : 'left-depth-tab px-2.5 py-1 rounded text-[11px] font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300 transition';
-    });
-
-    const defEl = document.getElementById('leftPageDefinition');
-    const noteEl = document.getElementById('leftPageDeepNote');
-    const levels = item.levels || {};
-
-    let mainText = item.definition;
-    let subNote = item.deepNote || `실무 요약: 이 개념은 ${layerObj.name}에서 핵심적인 역할을 담당합니다.`;
-
-    if (appState.leftDepthTab === 'beginner' && levels.beginner) {
-      mainText = levels.beginner;
-      subNote = item.studyGuide || item.deepNote || '';
-    } else if (appState.leftDepthTab === 'intermediate' && levels.intermediate) {
-      mainText = levels.intermediate;
-      subNote = item.deepNote || '';
-    } else if (appState.leftDepthTab === 'advanced' && levels.advanced) {
-      mainText = levels.advanced;
-      subNote = item.deepNote || '';
-    } else if (appState.leftDepthTab === 'study') {
-      mainText = item.studyGuide || '1단계(입문 개념 비유 이해) → 2단계(상단 그림 도해와 우측 애니메이션으로 데이터 흐름 파악) → 3단계(실습 코드 실행 및 퀴즈 풀이) 순서로 학습하세요.';
-      subNote = levels.beginner ? `[핵심 요약] ${levels.beginner}` : (item.deepNote || '');
-    }
-
-    defEl.innerHTML = formatReadableHtml(mainText);
-    noteEl.innerHTML = formatReadableHtml(subNote);
   }
 
   function triggerPageFlipAnimation() {
@@ -1181,33 +1192,9 @@
   }
 
   // --------------------------------------------------------------------------
-  // 8. 오른쪽 페이지: 단계별 애니메이션 플레이어 / 코딩 샌드박스 / 퀴즈
+  // 9. 제2절 대형 애니메이션 도판 & 제5절 코딩/퀴즈 렌더링
   // --------------------------------------------------------------------------
   function renderRightLabPage(item) {
-    const visualPane = document.getElementById('rightPaneVisualPlayer');
-    const codePane = document.getElementById('rightPaneCodeLab');
-    const quizPane = document.getElementById('rightPaneQuizLab');
-    const btnVisual = document.getElementById('btnLabModeVisual');
-    const btnCode = document.getElementById('btnLabModeCode');
-    const btnQuiz = document.getElementById('btnLabModeQuiz');
-
-    [visualPane, codePane, quizPane].forEach(p => p && p.classList.add('hidden'));
-    [btnVisual, btnCode, btnQuiz].forEach(b => {
-      if (b) b.className = 'px-2.5 py-1 rounded text-xs font-medium text-stone-700 hover:bg-stone-300/60 transition';
-    });
-
-    if (appState.rightLabMode === 'code') {
-      if (codePane) codePane.classList.remove('hidden');
-      if (btnCode) btnCode.className = 'px-2.5 py-1 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 transition';
-    } else if (appState.rightLabMode === 'quiz') {
-      if (quizPane) quizPane.classList.remove('hidden');
-      if (btnQuiz) btnQuiz.className = 'px-2.5 py-1 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 transition';
-    } else {
-      if (visualPane) visualPane.classList.remove('hidden');
-      if (btnVisual) btnVisual.className = 'px-2.5 py-1 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100 transition';
-    }
-
-    // 1) 시각 과정 플레이어 설정
     const steps = item.processSteps || [
       { title: '1단계: 개념 정의 및 입력', desc: '입력 데이터와 도메인 규칙이 시스템으로 전달됩니다.', nodes: ['데이터 유입', '전처리', '컨텍스트 구성', '준비 완료'] },
       { title: '2단계: 핵심 아키텍처 작동', desc: item.term + ' 핵심 메커니즘이 작동합니다.', nodes: ['핵심 연산 가동', '파라미터/규칙 활성화', '최적화 수행', '중간 검증'] },
@@ -1218,8 +1205,16 @@
     if (appState.currentProcessStep >= steps.length) appState.currentProcessStep = 0;
     const activeStep = steps[appState.currentProcessStep];
 
-    document.getElementById('visualDiagramTitle').textContent = item.term.split('(')[0].trim() + ' — 단계별 작동 시뮬레이션';
+    document.getElementById('visualDiagramTitle').textContent =
+      `그림과 애니메이션으로 보는 작동 구조 — ${item.term.split('(')[0].trim()}`;
 
+    // 대형 SVG 도해 렌더링 (1곳에 통합하여 큼직하게 표시)
+    const leftDiagramBox = document.getElementById('leftPageConceptDiagramBox');
+    if (leftDiagramBox) {
+      leftDiagramBox.innerHTML = buildConceptAnimatedSvg(item, appState.currentProcessStep);
+    }
+
+    // 4단계 프로세스 탭 버튼 (큼직한 폰트 `text-sm sm:text-base`)
     const stepTabsEl = document.getElementById('processStepTabs');
     if (stepTabsEl) {
       stepTabsEl.innerHTML = '';
@@ -1227,72 +1222,47 @@
         const isCurrent = idx === appState.currentProcessStep;
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'text-left p-2 rounded border transition ' +
+        b.className = 'text-left p-3.5 rounded-xl border transition ' +
           (isCurrent
-            ? 'bg-[#2c3e50] text-stone-100 border-[#2c3e50]'
-            : 'bg-[#faf8f3] text-stone-700 border-[#ccc4b4] hover:bg-stone-200/70');
+            ? 'bg-[#2c3e50] text-white border-[#2c3e50] shadow-md'
+            : 'bg-[#faf8f3] text-stone-800 border-[#ccc4b4] hover:bg-[#ebe6dc]');
         b.innerHTML = `
-          <div class="text-[10px] font-mono-code opacity-80">STEP 0${idx + 1}</div>
-          <div class="text-xs font-semibold truncate mt-0.5">${escapeHtml(st.title.replace(/^\d단계:\s*/, ''))}</div>
+          <div class="text-xs font-mono-code font-bold ${isCurrent ? 'text-amber-300' : 'text-[#7c5e3c]'}">STEP 0${idx + 1}</div>
+          <div class="text-sm sm:text-base font-bold mt-1 leading-snug">${escapeHtml(st.title.replace(/^\d단계:\s*/, ''))}</div>
         `;
         b.addEventListener('click', () => {
           stopProcessTimer();
           appState.currentProcessStep = idx;
-          const leftDiag = document.getElementById('leftPageConceptDiagramBox');
-          if (leftDiag) leftDiag.innerHTML = buildConceptAnimatedSvg(item, idx);
           renderRightLabPage(item);
         });
         stepTabsEl.appendChild(b);
       });
     }
 
+    // 세부 노드 상태 파이프라인 카드 (큰 글씨 `text-sm sm:text-base`)
     const stageEl = document.getElementById('visualStageBox');
     if (stageEl) {
       const nodes = activeStep.nodes || [];
       stageEl.innerHTML = `
-        <div class="w-full space-y-4">
-          <div class="flex items-center justify-between text-[11px] text-stone-500 border-b border-[#e2ddd3] pb-2">
-            <span class="font-mono-code font-semibold text-[#2c3e50]">STAGE 0${appState.currentProcessStep + 1} SCHEMATIC &amp; PIPELINE</span>
-            <span>${escapeHtml(activeStep.title)}</span>
-          </div>
-
-          <!-- 단계 연동 SVG 애니메이션 도해 -->
-          <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-lg p-2.5 overflow-x-auto">
-            ${buildConceptAnimatedSvg(item, appState.currentProcessStep)}
-          </div>
-
-          <!-- 4개 세부 노드 상태 카드 -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
-            ${nodes.map((nodeText, nIdx) => `
-              <div class="relative p-2.5 rounded-lg border ${nIdx === appState.currentProcessStep ? 'bg-[#2c3e50] text-stone-100 border-[#2c3e50] shadow-md' : 'bg-[#f3efe6] text-stone-800 border-[#ccc4b4]'} flex flex-col justify-between min-h-[72px] transition-all duration-300">
-                <div class="flex items-center justify-between text-[10px] font-mono-code ${nIdx === appState.currentProcessStep ? 'text-amber-300' : 'text-stone-500'}">
-                  <span>NODE 0${nIdx + 1}</span>
-                  <span>${nIdx <= appState.currentProcessStep ? 'ACTIVE' : 'WAIT'}</span>
-                </div>
-                <div class="text-xs font-semibold leading-snug mt-1">${escapeHtml(nodeText)}</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          ${nodes.map((nodeText, nIdx) => `
+            <div class="p-4 rounded-xl border ${nIdx === appState.currentProcessStep ? 'bg-[#2c3e50] text-white border-[#2c3e50] shadow-md' : 'bg-[#faf8f3] text-stone-800 border-[#ccc4b4]'} flex flex-col justify-between min-h-[88px] transition-all duration-300">
+              <div class="flex items-center justify-between text-xs font-mono-code font-bold ${nIdx === appState.currentProcessStep ? 'text-amber-300' : 'text-stone-500'}">
+                <span>NODE 0${nIdx + 1}</span>
+                <span>${nIdx <= appState.currentProcessStep ? 'ACTIVE' : 'WAIT'}</span>
               </div>
-            `).join('')}
-          </div>
-
-          <div class="pt-1">
-            <div class="w-full h-2 bg-[#e2ddd3] rounded-full overflow-hidden">
-              <div class="h-full bg-[#7c5e3c] transition-all duration-500" style="width: ${((appState.currentProcessStep + 1) / steps.length) * 100}%"></div>
+              <div class="text-sm sm:text-base font-bold leading-snug mt-2">${escapeHtml(nodeText)}</div>
             </div>
-            <div class="flex justify-between text-[10px] font-mono-code text-stone-500 mt-1">
-              <span>INPUT SIGNAL</span>
-              <span>PROGRESS (${Math.round(((appState.currentProcessStep + 1) / steps.length) * 100)}%)</span>
-              <span>VERIFIED OUTPUT</span>
-            </div>
-          </div>
+          `).join('')}
         </div>
       `;
     }
 
     document.getElementById('processStepBadge').textContent = `STEP 0${appState.currentProcessStep + 1} / 0${steps.length} · ${activeStep.title}`;
-    document.getElementById('processStepStatus').textContent = appState.processInterval ? '자동 재생 중...' : '단계를 클릭하거나 [과정 자동 재생]을 누르세요';
+    document.getElementById('processStepStatus').textContent = appState.processInterval ? '자동 순환 재생 중...' : '단계를 클릭하거나 [단계 자동 재생]을 누르세요';
     document.getElementById('processStepCaption').textContent = activeStep.desc;
 
-    // 2) 코딩 샌드박스 설정
+    // 제5절: 코딩 샌드박스 설정
     const lab = item.labConfig || {
       paramLabel: '실습 입력 프롬프트 설정',
       paramType: 'text',
@@ -1307,15 +1277,15 @@
     if (paramBox) {
       if (lab.paramType === 'select' && lab.options) {
         paramBox.innerHTML = `
-          <label class="block text-xs font-semibold text-stone-700">${escapeHtml(lab.paramLabel)}</label>
-          <select id="labDynamicParam" class="w-full bg-white border border-[#ccc4b4] rounded px-3 py-1.5 text-xs text-stone-900 focus:outline-none">
+          <label class="block text-xs sm:text-sm font-bold text-stone-800">${escapeHtml(lab.paramLabel)}</label>
+          <select id="labDynamicParam" class="w-full bg-white border border-[#ccc4b4] rounded-lg px-3.5 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none">
             ${lab.options.map(opt => `<option value="${escapeHtml(opt)}">${escapeHtml(opt)}</option>`).join('')}
           </select>
         `;
       } else {
         paramBox.innerHTML = `
-          <label class="block text-xs font-semibold text-stone-700">${escapeHtml(lab.paramLabel)}</label>
-          <input id="labDynamicParam" type="text" value="${escapeHtml(lab.defaultParam)}" class="w-full bg-white border border-[#ccc4b4] rounded px-3 py-1.5 text-xs text-stone-900 focus:outline-none">
+          <label class="block text-xs sm:text-sm font-bold text-stone-800">${escapeHtml(lab.paramLabel)}</label>
+          <input id="labDynamicParam" type="text" value="${escapeHtml(lab.defaultParam)}" class="w-full bg-white border border-[#ccc4b4] rounded-lg px-3.5 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none">
         `;
       }
     }
@@ -1338,7 +1308,6 @@
       });
     }
 
-    // 3) 이해도 점검 문제 풀이 (Quiz) 및 개인 학습 노트 설정
     renderQuizAndNotesBox(item);
   }
 
@@ -1362,36 +1331,38 @@
     const savedNote = appState.userNotes[item.id] || '';
 
     quizContainer.innerHTML = `
-      <div class="bg-[#faf8f3] border border-[#d6cfc2] rounded-lg p-4 space-y-3">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] font-mono-code font-bold text-[#7c5e3c]">CONCEPT CHECK QUIZ</span>
-          <span id="quizStatusBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded ${isPassed ? 'bg-emerald-800 text-stone-100' : 'bg-[#ebe6dc] text-stone-700'}">
-            ${isPassed ? '[정답 통과 완료]' : '보기를 선택해 문제를 풀어보세요'}
-          </span>
+      <div class="space-y-4">
+        <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-5 sm:p-6 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <span class="text-xs font-mono-code font-bold text-[#7c5e3c]">CONCEPT CHECK QUIZ</span>
+            <span id="quizStatusBadge" class="text-xs font-semibold px-2.5 py-1 rounded ${isPassed ? 'bg-emerald-800 text-stone-100' : 'bg-[#ebe6dc] text-stone-700'}">
+              ${isPassed ? '[정답 통과 완료]' : '보기를 선택해 문제를 풀어보세요'}
+            </span>
+          </div>
+          <p class="text-base sm:text-lg font-serif-book font-bold text-stone-900 leading-relaxed">Q. ${escapeHtml(quiz.question)}</p>
+          <div class="space-y-2.5 pt-1" id="quizOptionsList">
+            ${quiz.options.map((opt, oIdx) => `
+              <button type="button" data-opt-idx="${oIdx}" class="quiz-opt-btn w-full text-left p-3.5 rounded-xl border border-[#ccc4b4] bg-[#faf8f3] hover:bg-[#ebe6dc] text-sm sm:text-[15px] text-stone-800 transition flex items-start gap-2.5">
+                <span class="font-mono-code font-bold text-[#7c5e3c] shrink-0">0${oIdx + 1}.</span>
+                <span class="leading-relaxed">${escapeHtml(opt)}</span>
+              </button>
+            `).join('')}
+          </div>
+          <div id="quizFeedbackBox" class="${isPassed ? '' : 'hidden'} p-4 rounded-xl bg-[#faf8f3] border border-[#ccc4b4] text-sm text-stone-800 leading-relaxed">
+            <strong class="text-[#2c3e50]">정답 해설:</strong> ${escapeHtml(quiz.explanation)}
+          </div>
         </div>
-        <p class="text-xs sm:text-sm font-serif-book font-bold text-stone-900 leading-relaxed">Q. ${escapeHtml(quiz.question)}</p>
-        <div class="space-y-2 pt-1" id="quizOptionsList">
-          ${quiz.options.map((opt, oIdx) => `
-            <button type="button" data-opt-idx="${oIdx}" class="quiz-opt-btn w-full text-left p-2.5 rounded-lg border border-[#ccc4b4] bg-white hover:bg-[#f3efe6] text-xs text-stone-800 transition flex items-start gap-2">
-              <span class="font-mono-code font-bold text-[#7c5e3c] shrink-0">0${oIdx + 1}.</span>
-              <span class="leading-relaxed">${escapeHtml(opt)}</span>
-            </button>
-          `).join('')}
-        </div>
-        <div id="quizFeedbackBox" class="${isPassed ? '' : 'hidden'} p-3 rounded-lg bg-[#f3efe6] border border-[#dcd6c8] text-xs text-stone-800 leading-relaxed">
-          <strong class="text-[#2c3e50]">정답 해설:</strong> ${escapeHtml(quiz.explanation)}
-        </div>
-      </div>
 
-      <!-- 나만의 학습 노트 기록장 (웹/모바일 즉시 저장) -->
-      <div class="bg-[#faf8f3] border border-[#d6cfc2] rounded-lg p-3.5 space-y-2">
-        <div class="flex items-center justify-between">
-          <label for="userPersonalNoteInput" class="text-xs font-bold text-stone-800">나의 Learning Log 메모 및 질문 기록</label>
-          <button type="button" id="btnSavePersonalNote" class="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#2c3e50] text-stone-100 hover:bg-[#1e2b38] transition">
-            메모 저장
-          </button>
+        <!-- 나만의 학습 노트 기록장 -->
+        <div class="bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <label for="userPersonalNoteInput" class="text-sm font-bold text-stone-900">나의 Learning Log 메모 및 질문 기록</label>
+            <button type="button" id="btnSavePersonalNote" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#2c3e50] text-stone-100 hover:bg-[#1e2b38] transition">
+              메모 저장
+            </button>
+          </div>
+          <textarea id="userPersonalNoteInput" rows="3" placeholder="이 단원을 공부하며 깨달은 점이나 내 실무 프로젝트 적용 아이디어를 적어두세요..." class="w-full bg-[#faf8f3] border border-[#ccc4b4] rounded-xl p-3 text-sm text-stone-800 focus:outline-none focus:border-[#2c3e50]">${escapeHtml(savedNote)}</textarea>
         </div>
-        <textarea id="userPersonalNoteInput" rows="2" placeholder="이 단원을 공부하며 깨달은 점이나 내 실무 프로젝트 적용 아이디어를 적어두세요..." class="w-full bg-white border border-[#ccc4b4] rounded p-2 text-xs text-stone-800 focus:outline-none focus:border-[#2c3e50]">${escapeHtml(savedNote)}</textarea>
       </div>
     `;
 
@@ -1403,11 +1374,11 @@
 
         quizContainer.querySelectorAll('.quiz-opt-btn').forEach((b, idx) => {
           if (idx === quiz.answerIndex) {
-            b.className = 'quiz-opt-btn w-full text-left p-2.5 rounded-lg border-2 border-emerald-700 bg-emerald-50 text-xs font-semibold text-emerald-950 flex items-start gap-2';
+            b.className = 'quiz-opt-btn w-full text-left p-3.5 rounded-xl border-2 border-emerald-700 bg-emerald-50 text-sm sm:text-[15px] font-semibold text-emerald-950 flex items-start gap-2.5';
           } else if (idx === chosen && chosen !== quiz.answerIndex) {
-            b.className = 'quiz-opt-btn w-full text-left p-2.5 rounded-lg border-2 border-rose-700 bg-rose-50 text-xs text-rose-950 flex items-start gap-2';
+            b.className = 'quiz-opt-btn w-full text-left p-3.5 rounded-xl border-2 border-rose-700 bg-rose-50 text-sm sm:text-[15px] text-rose-950 flex items-start gap-2.5';
           } else {
-            b.className = 'quiz-opt-btn w-full text-left p-2.5 rounded-lg border border-[#ccc4b4] bg-white opacity-70 text-xs text-stone-700 flex items-start gap-2';
+            b.className = 'quiz-opt-btn w-full text-left p-3.5 rounded-xl border border-[#ccc4b4] bg-[#faf8f3] opacity-70 text-sm sm:text-[15px] text-stone-700 flex items-start gap-2.5';
           }
         });
 
@@ -1420,13 +1391,13 @@
           renderProgress();
           if (badge) {
             badge.textContent = '[정답 확인 · 완독 및 퀴즈 통과 기록됨]';
-            badge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-800 text-stone-100';
+            badge.className = 'text-xs font-semibold px-2.5 py-1 rounded bg-emerald-800 text-stone-100';
           }
           showToast('정답입니다. 해당 단원이 완독 및 퀴즈 통과 처리되었습니다.');
         } else {
           if (badge) {
             badge.textContent = '오답입니다. 아래 정답 해설을 확인해 보세요.';
-            badge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded bg-rose-800 text-stone-100';
+            badge.className = 'text-xs font-semibold px-2.5 py-1 rounded bg-rose-800 text-stone-100';
           }
         }
       });
@@ -1444,7 +1415,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 9. VIEW 2: 직업군별(6대 직군) 맞춤 기술·개념·용어 로드맵 뷰
+  // 10. VIEW 2: 직업군별(6대 직군) 맞춤 기술·개념·용어 로드맵 뷰
   // --------------------------------------------------------------------------
   function renderRolesView() {
     const listEl = document.getElementById('jobRolesList');
@@ -1459,15 +1430,15 @@
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'w-full text-left rounded-lg p-4 border transition-all ' +
-        (isSelected ? 'layer-active' : 'bg-[#faf8f3] border-[#dcd6c8] hover:bg-[#f3efe6]');
+      btn.className = 'w-full text-left rounded-xl p-4 border transition-all ' +
+        (isSelected ? 'layer-active' : 'bg-[#f3efe6] border-[#dcd6c8] hover:bg-[#eae4d7]');
       btn.innerHTML = `
         <div class="flex items-center justify-between">
           <span class="text-xs font-mono-code font-bold text-[#7c5e3c]">${escapeHtml(role.code)} · ${escapeHtml(role.shortName)}</span>
-          <span class="text-[11px] font-mono-code px-2 py-0.5 rounded bg-[#ebe6dc] text-stone-700">필수 단원 ${learnedInRole}/${roleTerms.length}</span>
+          <span class="text-xs font-mono-code px-2 py-0.5 rounded bg-[#ebe6dc] text-stone-700">필수 단원 ${learnedInRole}/${roleTerms.length}</span>
         </div>
-        <h3 class="text-sm sm:text-base font-serif-book font-bold text-stone-900 mt-1">${escapeHtml(role.name)}</h3>
-        <p class="text-xs text-stone-600 mt-1 line-clamp-2">${escapeHtml(role.tagline)}</p>
+        <h3 class="text-base font-serif-book font-bold text-stone-900 mt-1">${escapeHtml(role.name)}</h3>
+        <p class="text-xs sm:text-sm text-stone-600 mt-1 line-clamp-2">${escapeHtml(role.tagline)}</p>
       `;
       btn.addEventListener('click', () => {
         appState.selectedRole = role.id;
@@ -1482,14 +1453,14 @@
     const roleTerms = appState.terms.filter(t => (t.roles || []).includes(activeRole.id));
 
     const roadmapHtml = (activeRole.studyRoadmap || []).map(rm => `
-      <div class="bg-[#faf8f3] border border-[#dcd6c8] rounded-lg p-3 flex flex-col sm:flex-row sm:items-center gap-2">
-        <span class="text-xs font-mono-code font-bold text-[#7c5e3c] shrink-0 sm:w-28">${escapeHtml(rm.step)}</span>
-        <span class="text-xs text-stone-800 leading-relaxed">${escapeHtml(rm.focus)}</span>
+      <div class="bg-[#faf8f3] border border-[#dcd6c8] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center gap-2.5">
+        <span class="text-xs font-mono-code font-bold text-[#7c5e3c] shrink-0 sm:w-32">${escapeHtml(rm.step)}</span>
+        <span class="text-sm text-stone-800 leading-relaxed">${escapeHtml(rm.focus)}</span>
       </div>
     `).join('');
 
     const keyTermsHtml = (activeRole.keyTerms || []).map(kt => `
-      <button type="button" data-role-term="${escapeHtml(kt)}" class="btn-role-term-search text-xs font-medium px-2.5 py-1 rounded bg-[#faf8f3] hover:bg-[#2c3e50] hover:text-stone-100 text-stone-800 border border-[#ccc4b4] transition">
+      <button type="button" data-role-term="${escapeHtml(kt)}" class="btn-role-term-search text-xs sm:text-sm font-medium px-3 py-1.5 rounded-lg bg-[#faf8f3] hover:bg-[#2c3e50] hover:text-stone-100 text-stone-800 border border-[#ccc4b4] transition">
         ${escapeHtml(kt)} →
       </button>
     `).join('');
@@ -1500,47 +1471,47 @@
       const diffMeta = getDifficultyMeta(t.difficulty);
       const isLearned = !!appState.learnedIds[t.id];
       return `
-        <div class="bg-[#faf8f3] border border-[#dcd6c8] rounded-lg p-3.5 space-y-1.5 flex flex-col justify-between">
+        <div class="bg-[#faf8f3] border border-[#dcd6c8] rounded-xl p-4 space-y-2 flex flex-col justify-between">
           <div class="flex items-center justify-between gap-2 flex-wrap">
             <div class="flex items-center gap-1.5">
-              <span class="text-[11px] font-mono-code font-bold text-[#7c5e3c]">[${escapeHtml(t.sectionCode || '')}]</span>
-              <span class="text-[10px] px-1.5 py-0.2 rounded border ${diffMeta.colorClass}">${diffMeta.badge}</span>
-              ${isLearned ? '<span class="text-[10px] px-1.5 py-0.2 rounded bg-stone-800 text-stone-100">완독</span>' : ''}
+              <span class="text-xs font-mono-code font-bold text-[#7c5e3c]">[${escapeHtml(t.sectionCode || '')}]</span>
+              <span class="text-xs px-2 py-0.5 rounded border ${diffMeta.colorClass}">${diffMeta.badge}</span>
+              ${isLearned ? '<span class="text-xs px-2 py-0.5 rounded bg-stone-800 text-stone-100">완독</span>' : ''}
             </div>
-            <button type="button" data-open-page="${pageIdx}" class="btn-role-open-page text-xs font-semibold text-[#2c3e50] hover:underline shrink-0">
-              p.${pStr} 본문 학습 →
+            <button type="button" data-open-page="${pageIdx}" class="btn-role-open-page text-xs sm:text-sm font-bold text-[#2c3e50] hover:underline shrink-0">
+              p.${pStr} 본문 읽기 →
             </button>
           </div>
-          <h4 class="text-sm font-serif-book font-bold text-stone-900">${escapeHtml(t.term)}</h4>
-          <p class="text-xs text-stone-600 line-clamp-2">${escapeHtml(t.analogy)}</p>
+          <h4 class="text-base font-serif-book font-bold text-stone-900">${escapeHtml(t.term)}</h4>
+          <p class="text-xs sm:text-sm text-stone-600 line-clamp-2">${escapeHtml(t.analogy)}</p>
         </div>
       `;
     }).join('');
 
     detailEl.innerHTML = `
-      <div class="border-b border-[#dcd6c8] pb-3">
+      <div class="border-b border-[#dcd6c8] pb-4">
         <span class="text-xs font-mono-code font-bold text-[#7c5e3c]">${escapeHtml(activeRole.code)} · ROLE-BASED LEARNING TRACK</span>
-        <h3 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900 mt-1">${escapeHtml(activeRole.name)}</h3>
-        <p class="text-xs sm:text-sm text-stone-700 mt-1.5 leading-relaxed">${escapeHtml(activeRole.summary)}</p>
+        <h3 class="text-xl sm:text-2xl font-serif-book font-bold text-stone-900 mt-1">${escapeHtml(activeRole.name)}</h3>
+        <p class="text-sm sm:text-base text-stone-700 mt-2 leading-relaxed">${escapeHtml(activeRole.summary)}</p>
       </div>
 
       <div>
-        <h4 class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">단계별 추천 커리큘럼 (입문 → 심화)</h4>
-        <div class="space-y-2">
+        <h4 class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2.5">단계별 추천 커리큘럼 (입문 → 심화)</h4>
+        <div class="space-y-2.5">
           ${roadmapHtml}
         </div>
       </div>
 
       <div>
-        <h4 class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">이 직군의 필수 숙지 개념 · 용어 (클릭 시 검색)</h4>
-        <div class="flex flex-wrap gap-1.5">
+        <h4 class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2.5">이 직군의 필수 숙지 개념 · 용어 (클릭 시 검색)</h4>
+        <div class="flex flex-wrap gap-2">
           ${keyTermsHtml}
         </div>
       </div>
 
       <div>
-        <h4 class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">이 직군이 반드시 읽어야 할 본문 단원 (${roleTerms.length}개)</h4>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
+        <h4 class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2.5">이 직군이 반드시 읽어야 할 본문 단원 (${roleTerms.length}개)</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           ${matchedCardsHtml}
         </div>
       </div>
@@ -1565,7 +1536,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 10. VIEW 3: 5계층 아키텍처 뷰 (상호작용 SVG 스택 도해 포함)
+  // 11. VIEW 3: 5계층 아키텍처 뷰
   // --------------------------------------------------------------------------
   function renderArchitectureView() {
     const listEl = document.getElementById('archLayersList');
@@ -1579,15 +1550,15 @@
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'w-full text-left rounded-lg p-4 border transition-all ' +
-        (isSelected ? 'layer-active' : 'bg-[#faf8f3] border-[#dcd6c8] hover:bg-[#f3efe6]');
+      btn.className = 'w-full text-left rounded-xl p-4 border transition-all ' +
+        (isSelected ? 'layer-active' : 'bg-[#f3efe6] border-[#dcd6c8] hover:bg-[#eae4d7]');
       btn.innerHTML = `
         <div class="flex items-center justify-between">
-          <span class="text-[11px] font-mono-code font-bold text-[#7c5e3c]">${escapeHtml(layer.order)}</span>
-          <span class="text-[11px] font-medium px-2 py-0.5 rounded bg-[#ebe6dc] text-stone-700">수록 단원 ${countInLayer}개</span>
+          <span class="text-xs font-mono-code font-bold text-[#7c5e3c]">${escapeHtml(layer.order)}</span>
+          <span class="text-xs font-medium px-2 py-0.5 rounded bg-[#ebe6dc] text-stone-700">수록 단원 ${countInLayer}개</span>
         </div>
-        <h3 class="text-sm sm:text-base font-serif-book font-bold text-stone-900 mt-1">${escapeHtml(layer.name)}</h3>
-        <p class="text-xs text-stone-600 mt-1 line-clamp-2">${escapeHtml(layer.summary)}</p>
+        <h3 class="text-base font-serif-book font-bold text-stone-900 mt-1">${escapeHtml(layer.name)}</h3>
+        <p class="text-xs sm:text-sm text-stone-600 mt-1 line-clamp-2">${escapeHtml(layer.summary)}</p>
       `;
       btn.addEventListener('click', () => {
         appState.selectedArchLayer = layer.id;
@@ -1600,43 +1571,43 @@
     const layerTerms = appState.terms.filter(t => t.layer === activeLayer.id);
 
     const programsHtml = activeLayer.keyPrograms.map(p =>
-      `<span class="text-xs font-medium px-3 py-1 rounded bg-[#faf8f3] text-stone-800 border border-[#ccc4b4]">${escapeHtml(p)}</span>`
+      `<span class="text-xs sm:text-sm font-medium px-3 py-1.5 rounded-lg bg-[#faf8f3] text-stone-800 border border-[#ccc4b4]">${escapeHtml(p)}</span>`
     ).join('');
 
     const termsHtml = layerTerms.map(t => {
       const pageIdx = appState.terms.findIndex(x => x.id === t.id);
       const pStr = String(pageIdx + 1).padStart(2, '0');
       return `
-        <div class="bg-[#faf8f3] border border-[#dcd6c8] rounded-lg p-3.5 space-y-1.5 flex flex-col justify-between">
+        <div class="bg-[#faf8f3] border border-[#dcd6c8] rounded-xl p-4 space-y-2 flex flex-col justify-between">
           <div class="flex items-center justify-between gap-2">
-            <h4 class="text-sm font-serif-book font-bold text-stone-900">[${escapeHtml(t.sectionCode || '')}] ${escapeHtml(t.term)}</h4>
-            <button type="button" data-open-page="${pageIdx}" class="btn-arch-open-page text-xs font-semibold text-[#2c3e50] hover:underline shrink-0">
+            <h4 class="text-base font-serif-book font-bold text-stone-900">[${escapeHtml(t.sectionCode || '')}] ${escapeHtml(t.term)}</h4>
+            <button type="button" data-open-page="${pageIdx}" class="btn-arch-open-page text-xs sm:text-sm font-bold text-[#2c3e50] hover:underline shrink-0">
               p.${pStr} 본문 펼치기 →
             </button>
           </div>
-          <p class="text-xs text-[#7c5e3c] font-medium">비유: ${escapeHtml(t.analogy)}</p>
-          <p class="text-xs text-stone-600">${escapeHtml(t.definition)}</p>
+          <p class="text-xs sm:text-sm text-[#7c5e3c] font-medium">비유: ${escapeHtml(t.analogy)}</p>
+          <p class="text-xs sm:text-sm text-stone-600 leading-relaxed">${escapeHtml(t.definition)}</p>
         </div>
       `;
     }).join('');
 
     detailEl.innerHTML = `
-      <div class="border-b border-[#dcd6c8] pb-3">
+      <div class="border-b border-[#dcd6c8] pb-4">
         <span class="text-xs font-mono-code font-bold text-[#7c5e3c]">${escapeHtml(activeLayer.order)}</span>
-        <h3 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900 mt-1">${escapeHtml(activeLayer.name)}</h3>
-        <p class="text-xs sm:text-sm text-stone-700 mt-1.5 leading-relaxed">${escapeHtml(activeLayer.summary)}</p>
+        <h3 class="text-xl sm:text-2xl font-serif-book font-bold text-stone-900 mt-1">${escapeHtml(activeLayer.name)}</h3>
+        <p class="text-sm sm:text-base text-stone-700 mt-2 leading-relaxed">${escapeHtml(activeLayer.summary)}</p>
       </div>
-      <div class="bg-[#faf8f3] border-l-4 border-[#2c3e50] p-3.5 rounded-r-lg">
+      <div class="bg-[#faf8f3] border-l-4 border-[#2c3e50] p-4 rounded-r-xl">
         <div class="text-xs font-bold text-stone-800 mb-1">핵심 엔지니어링 포인트</div>
-        <p class="text-xs sm:text-sm text-stone-700 leading-relaxed">${escapeHtml(activeLayer.whyItMatters)}</p>
+        <p class="text-sm sm:text-base text-stone-700 leading-relaxed">${escapeHtml(activeLayer.whyItMatters)}</p>
       </div>
       <div>
-        <h4 class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">대표 프로그램 · 모델 · 프로토콜</h4>
-        <div class="flex flex-wrap gap-1.5">${programsHtml}</div>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2.5">대표 프로그램 · 모델 · 프로토콜</h4>
+        <div class="flex flex-wrap gap-2">${programsHtml}</div>
       </div>
       <div>
-        <h4 class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">이 계층에 속하는 본문 단원 (${layerTerms.length}개)</h4>
-        <div class="space-y-2.5 max-h-[340px] overflow-y-auto custom-scrollbar pr-1">${termsHtml}</div>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2.5">이 계층에 속하는 본문 단원 (${layerTerms.length}개)</h4>
+        <div class="space-y-3">${termsHtml}</div>
       </div>
     `;
 
@@ -1649,7 +1620,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 11. VIEW 4 & 5: 실전 도구 디렉터리 및 플레이북 레시피
+  // 12. VIEW 4 & 5: 실전 도구 디렉터리 및 플레이북 레시피
   // --------------------------------------------------------------------------
   function renderToolsView() {
     const grid = document.getElementById('toolsGrid');
@@ -1669,8 +1640,8 @@
     if (filtered.length === 0) {
       grid.innerHTML = `
         <div class="col-span-full bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-8 text-center space-y-3">
-          <p class="text-sm font-semibold text-stone-700">검색 조건에 해당하는 도구가 없습니다.</p>
-          <button id="btnResetToolSearch" type="button" class="px-3 py-1.5 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100">전체 도구 목록 보기</button>
+          <p class="text-base font-semibold text-stone-700">검색 조건에 해당하는 도구가 없습니다.</p>
+          <button id="btnResetToolSearch" type="button" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-[#2c3e50] text-stone-100">전체 도구 목록 보기</button>
         </div>
       `;
       const resetBtn = document.getElementById('btnResetToolSearch');
@@ -1689,38 +1660,38 @@
 
     filtered.forEach(tool => {
       const stepsHtml = tool.usageSteps.map((s, idx) =>
-        `<li class="text-xs text-stone-700 flex items-start gap-2"><span class="font-mono-code font-bold text-[#7c5e3c] shrink-0">0${idx + 1}.</span><span>${escapeHtml(s)}</span></li>`
+        `<li class="text-xs sm:text-sm text-stone-700 flex items-start gap-2"><span class="font-mono-code font-bold text-[#7c5e3c] shrink-0">0${idx + 1}.</span><span>${escapeHtml(s)}</span></li>`
       ).join('');
 
       const card = document.createElement('div');
-      card.className = 'bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-5 flex flex-col justify-between space-y-4';
+      card.className = 'bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-6 flex flex-col justify-between space-y-4';
       card.innerHTML = `
-        <div class="space-y-3">
+        <div class="space-y-3.5">
           <div class="flex items-center justify-between gap-2">
-            <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-[#ebe6dc] text-stone-800 border border-[#ccc4b4]">${escapeHtml(tool.catLabel)}</span>
-            <span class="text-[11px] font-mono-code text-stone-500">${escapeHtml(tool.layer)} 계층 · Part ${tool.chapter}</span>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded bg-[#ebe6dc] text-stone-800 border border-[#ccc4b4]">${escapeHtml(tool.catLabel)}</span>
+            <span class="text-xs font-mono-code text-stone-500">${escapeHtml(tool.layer)} 계층 · Part ${tool.chapter}</span>
           </div>
           <div>
             <div class="flex items-baseline gap-2">
-              <h3 class="text-base sm:text-lg font-serif-book font-bold text-stone-900">${escapeHtml(tool.name)}</h3>
+              <h3 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900">${escapeHtml(tool.name)}</h3>
               <span class="text-xs text-stone-500">by ${escapeHtml(tool.org)}</span>
             </div>
-            <p class="text-xs sm:text-sm text-stone-700 mt-1.5 leading-relaxed">${escapeHtml(tool.summary)}</p>
+            <p class="text-sm text-stone-700 mt-1.5 leading-relaxed">${escapeHtml(tool.summary)}</p>
           </div>
-          <div class="bg-[#1c1917] rounded-lg p-3 flex items-center justify-between gap-2">
-            <code class="text-[11px] sm:text-xs font-mono-code text-stone-200 overflow-x-auto custom-scrollbar whitespace-nowrap">${escapeHtml(tool.installCmd)}</code>
-            <button type="button" data-copy-cmd="${escapeHtml(tool.installCmd)}" class="btn-copy-cmd shrink-0 text-[11px] font-medium px-2.5 py-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-100">복사</button>
+          <div class="bg-[#1c1917] rounded-xl p-3.5 flex items-center justify-between gap-2">
+            <code class="text-xs sm:text-sm font-mono-code text-stone-200 overflow-x-auto custom-scrollbar whitespace-nowrap">${escapeHtml(tool.installCmd)}</code>
+            <button type="button" data-copy-cmd="${escapeHtml(tool.installCmd)}" class="btn-copy-cmd shrink-0 text-xs font-medium px-3 py-1 rounded bg-stone-700 hover:bg-stone-600 text-stone-100">복사</button>
           </div>
-          <div class="space-y-1.5">
-            <div class="text-[11px] font-bold uppercase tracking-wider text-stone-500">3단계 실전 사용 절차</div>
+          <div class="space-y-2">
+            <div class="text-xs font-bold uppercase tracking-wider text-stone-500">3단계 실전 사용 절차</div>
             <ul class="space-y-1.5">${stepsHtml}</ul>
           </div>
         </div>
         <div class="pt-3 border-t border-[#dcd6c8] flex items-center justify-between gap-2 flex-wrap">
-          <div class="flex flex-wrap gap-1">
-            ${tool.relatedTerms.map(rt => `<span class="text-[11px] px-2 py-0.5 rounded bg-[#faf8f3] text-stone-600 border border-[#dcd6c8]">${escapeHtml(rt)}</span>`).join('')}
+          <div class="flex flex-wrap gap-1.5">
+            ${tool.relatedTerms.map(rt => `<span class="text-xs px-2.5 py-0.5 rounded bg-[#faf8f3] text-stone-600 border border-[#dcd6c8]">${escapeHtml(rt)}</span>`).join('')}
           </div>
-          <a href="${escapeHtml(tool.url)}" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-[#2c3e50] hover:underline">공식 문서 →</a>
+          <a href="${escapeHtml(tool.url)}" target="_blank" rel="noopener noreferrer" class="text-xs sm:text-sm font-bold text-[#2c3e50] hover:underline">공식 문서 →</a>
         </div>
       `;
       grid.appendChild(card);
@@ -1737,8 +1708,8 @@
     document.querySelectorAll('.tool-cat-btn').forEach(btn => {
       const c = btn.getAttribute('data-toolcat');
       btn.className = c === appState.selectedToolCat
-        ? 'tool-cat-btn px-3 py-1 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100'
-        : 'tool-cat-btn px-3 py-1 rounded text-xs font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300';
+        ? 'tool-cat-btn px-3 py-1.5 rounded text-xs font-semibold bg-[#2c3e50] text-stone-100'
+        : 'tool-cat-btn px-3 py-1.5 rounded text-xs font-medium bg-[#ebe6dc] text-stone-700 hover:bg-stone-300';
     });
   }
 
@@ -1749,24 +1720,24 @@
 
     window.PLAYBOOK_RECIPES.forEach(recipe => {
       const stackHtml = recipe.stack.map(s => `
-        <div class="flex items-center justify-between bg-[#faf8f3] border border-[#dcd6c8] rounded px-3 py-2 text-xs">
+        <div class="flex items-center justify-between bg-[#faf8f3] border border-[#dcd6c8] rounded-lg px-3.5 py-2.5 text-xs sm:text-sm">
           <span class="font-medium text-stone-500">${escapeHtml(s.role)}</span>
-          <span class="font-semibold text-stone-900">${escapeHtml(s.item)}</span>
+          <span class="font-bold text-stone-900">${escapeHtml(s.item)}</span>
         </div>
       `).join('');
 
       const card = document.createElement('div');
-      card.className = 'bg-[#f3efe6] border border-[#dcd6c8] rounded-xl p-5 space-y-4 flex flex-col justify-between';
+      card.className = 'bg-[#f3efe6] border border-[#dcd6c8] rounded-2xl p-6 space-y-4 flex flex-col justify-between';
       card.innerHTML = `
         <div class="space-y-3">
           <div>
-            <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-[#ebe6dc] text-[#7c5e3c] border border-[#ccc4b4]">${escapeHtml(recipe.target)}</span>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded bg-[#ebe6dc] text-[#7c5e3c] border border-[#ccc4b4]">${escapeHtml(recipe.target)}</span>
           </div>
-          <h3 class="text-base sm:text-lg font-serif-book font-bold text-stone-900">${escapeHtml(recipe.title)}</h3>
-          <p class="text-xs sm:text-sm text-stone-700">${escapeHtml(recipe.goal)}</p>
+          <h3 class="text-lg sm:text-xl font-serif-book font-bold text-stone-900">${escapeHtml(recipe.title)}</h3>
+          <p class="text-sm text-stone-700 leading-relaxed">${escapeHtml(recipe.goal)}</p>
           <div class="space-y-2 pt-1">${stackHtml}</div>
         </div>
-        <div class="bg-[#faf8f3] border-l-4 border-[#7c5e3c] p-3 text-xs text-stone-700 leading-relaxed">
+        <div class="bg-[#faf8f3] border-l-4 border-[#7c5e3c] p-4 rounded-r-xl text-xs sm:text-sm text-stone-700 leading-relaxed">
           <strong class="text-stone-900">실무 조언:</strong> ${escapeHtml(recipe.tip)}
         </div>
       `;
@@ -1775,7 +1746,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 12. VIEW 6: 전체 수록 용어 · 개념 색인표
+  // 13. VIEW 6: 전체 수록 용어 · 개념 색인표
   // --------------------------------------------------------------------------
   function renderIndexGridView() {
     const grid = document.getElementById('ebookItemsGrid');
@@ -1799,22 +1770,22 @@
       const secStr = item.sectionCode || `${ch.id}.${idx + 1}`;
 
       const card = document.createElement('div');
-      card.className = 'bg-[#f3efe6] hover:bg-[#ebe5d8] border border-[#dcd6c8] rounded-xl p-4 flex flex-col justify-between cursor-pointer transition';
+      card.className = 'bg-[#f3efe6] hover:bg-[#ebe5d8] border border-[#dcd6c8] rounded-2xl p-5 flex flex-col justify-between cursor-pointer transition';
       card.innerHTML = `
         <div class="space-y-2">
-          <div class="flex items-center justify-between text-[11px] text-stone-500">
-            <div class="flex items-center gap-1.5">
+          <div class="flex items-center justify-between text-xs text-stone-500">
+            <div class="flex items-center gap-2">
               <span class="font-mono-code font-bold text-[#7c5e3c]">[${escapeHtml(secStr)}]</span>
               <span class="font-semibold text-stone-700">${escapeHtml(ch.shortLabel)}</span>
-              <span class="text-[10px] px-1.5 py-0.2 rounded border ${diffMeta.colorClass}">${diffMeta.badge}</span>
+              <span class="text-xs px-2 py-0.5 rounded border ${diffMeta.colorClass}">${diffMeta.badge}</span>
             </div>
             <span class="font-serif-book font-bold text-stone-700">p. ${pStr}</span>
           </div>
-          <h3 class="text-sm sm:text-base font-serif-book font-bold text-stone-900">${escapeHtml(item.term)}</h3>
-          <p class="text-xs text-stone-700 line-clamp-2">${escapeHtml(item.analogy)}</p>
+          <h3 class="text-base sm:text-lg font-serif-book font-bold text-stone-900">${escapeHtml(item.term)}</h3>
+          <p class="text-xs sm:text-sm text-stone-700 line-clamp-2 leading-relaxed">${escapeHtml(item.analogy)}</p>
         </div>
-        <div class="mt-3 pt-2 border-t border-[#dcd6c8] flex items-center justify-between text-xs font-semibold text-[#2c3e50]">
-          <span>본문 · 그림 도해 · 실습 펼치기</span>
+        <div class="mt-4 pt-2.5 border-t border-[#dcd6c8] flex items-center justify-between text-xs sm:text-sm font-bold text-[#2c3e50]">
+          <span>본문 챕터 · 그림 도판 열기</span>
           <span>→</span>
         </div>
       `;
@@ -1826,7 +1797,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 13. 메인 뷰 전환
+  // 14. 메인 뷰 전환
   // --------------------------------------------------------------------------
   function switchMainView(viewName) {
     stopProcessTimer();
@@ -1841,9 +1812,11 @@
     document.querySelectorAll('.nav-tab').forEach(tab => {
       const v = tab.getAttribute('data-view');
       tab.className = v === viewName
-        ? 'nav-tab px-3 py-1 rounded text-xs font-semibold transition bg-[#2c3e50] text-stone-100 whitespace-nowrap'
-        : 'nav-tab px-3 py-1 rounded text-xs font-medium transition text-stone-600 hover:bg-stone-200/70 whitespace-nowrap';
+        ? 'nav-tab w-full text-left px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition bg-[#2c3e50] text-white flex items-center justify-between'
+        : 'nav-tab w-full text-left px-3 py-2 rounded-lg text-xs sm:text-sm font-medium text-stone-300 hover:bg-[#2a323c] transition flex items-center justify-between';
     });
+
+    renderSidebarTree();
 
     if (viewName === 'toc') renderTocView();
     if (viewName === 'ebook') renderBookSpreadView();
@@ -1857,7 +1830,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 14. 스마트 목차 끼워넣기 모달 & Git 원고 내보내기 빌더
+  // 15. 스마트 목차 끼워넣기 모달 & Git 원고 내보내기 빌더
   // --------------------------------------------------------------------------
   function populateAddModalPositionSelect() {
     const chVal = parseInt(document.getElementById('inputChapter').value, 10) || 3;
@@ -1928,7 +1901,6 @@
       }, null, 2);
     }
 
-    // Default: Markdown Export
     const lines = [];
     lines.push('# AI-Book — AI-Book: Learning Log');
     lines.push('');
@@ -1966,7 +1938,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // 15. 이벤트 바인딩 및 초기화
+  // 16. 이벤트 바인딩 및 초기화
   // --------------------------------------------------------------------------
   window.addEventListener('DOMContentLoaded', () => {
     loadSavedState();
@@ -1978,25 +1950,41 @@
     renderPlaybookView();
     renderIndexGridView();
 
-    // 상단 네비게이션 탭
+    // 사이드바 브랜드 클릭 시 서문으로 이동
+    const brandBtn = document.getElementById('btnBrandGoCover');
+    if (brandBtn) brandBtn.addEventListener('click', () => {
+      closeMobileSidebar();
+      switchMainView('toc');
+    });
+
+    // 모바일 사이드바 열기/닫기
+    const btnMobOpen = document.getElementById('btnMobileOpenSidebar');
+    const btnMobClose = document.getElementById('btnCloseMobileSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (btnMobOpen) btnMobOpen.addEventListener('click', openMobileSidebar);
+    if (btnMobClose) btnMobClose.addEventListener('click', closeMobileSidebar);
+    if (backdrop) backdrop.addEventListener('click', closeMobileSidebar);
+
+    // 데스크톱 좌측 사이드바 접기/펼치기 토글
+    const btnToggleDesktopSb = document.getElementById('btnToggleDesktopSidebar');
+    if (btnToggleDesktopSb) {
+      btnToggleDesktopSb.addEventListener('click', () => {
+        const sb = document.getElementById('bookSidebar');
+        if (!sb) return;
+        appState.desktopSidebarCollapsed = !appState.desktopSidebarCollapsed;
+        if (appState.desktopSidebarCollapsed) {
+          sb.classList.add('lg:hidden');
+        } else {
+          sb.classList.remove('lg:hidden');
+        }
+      });
+    }
+
+    // 사이드바 내비게이션 탭
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.addEventListener('click', () => {
+        closeMobileSidebar();
         switchMainView(tab.getAttribute('data-view'));
-      });
-    });
-
-    // 첫 페이지(서문·소개) / 목차 표시 전환 버튼
-    document.querySelectorAll('.front-mode-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        appState.frontMode = btn.getAttribute('data-frontmode') || 'all';
-        updateFrontPageModeUI();
-      });
-    });
-
-    document.querySelectorAll('.front-page-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        appState.frontMode = btn.getAttribute('data-fronttab') || 'all';
-        updateFrontPageModeUI();
       });
     });
 
@@ -2017,63 +2005,21 @@
       });
     });
 
-    // 첫 페이지 펼치기 & 목차 복귀
+    // 첫 페이지 펼치기
     const btnStart = document.getElementById('btnStartFirstPage');
     if (btnStart) btnStart.addEventListener('click', () => openBookAtPage(0));
 
-    const btnBackToc = document.getElementById('btnBackToToc');
-    if (btnBackToc) btnBackToc.addEventListener('click', () => switchMainView('toc'));
-
-    // 왼쪽 페이지 도해 애니메이션 일시정지/재생 토글
+    // 도해 애니메이션 일시정지/재생 토글
     const btnToggleAnim = document.getElementById('btnToggleDiagramAnim');
     if (btnToggleAnim) {
       btnToggleAnim.addEventListener('click', () => {
         appState.diagramAnimPaused = !appState.diagramAnimPaused;
-        btnToggleAnim.textContent = appState.diagramAnimPaused ? '애니메이션 재생' : '애니메이션 일시정지';
+        btnToggleAnim.textContent = appState.diagramAnimPaused ? '점선 흐름 재생' : '점선 흐름 일시정지';
         renderBookSpreadView();
       });
     }
 
-    // 모바일 좌/우 페이지 전환 버튼
-    const btnMobLeft = document.getElementById('btnMobilePaneLeft');
-    const btnMobRight = document.getElementById('btnMobilePaneRight');
-    if (btnMobLeft) {
-      btnMobLeft.addEventListener('click', () => {
-        appState.mobilePane = 'left';
-        updateMobilePaneVisibility();
-      });
-    }
-    if (btnMobRight) {
-      btnMobRight.addEventListener('click', () => {
-        appState.mobilePane = 'right';
-        updateMobilePaneVisibility();
-      });
-    }
-
-    // 왼쪽 페이지 수준별 깊이 탭
-    document.querySelectorAll('.left-depth-tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        appState.leftDepthTab = btn.getAttribute('data-depthtab') || 'all';
-        const cur = appState.terms[appState.currentPageIdx];
-        const layerObj = window.ARCH_LAYERS.find(l => l.id === cur.layer) || window.ARCH_LAYERS[0];
-        renderLeftDepthContent(cur, layerObj);
-      });
-    });
-
-    // 페이지 점프 드롭다운
-    const pageJump = document.getElementById('pageJumpSelect');
-    if (pageJump) {
-      pageJump.addEventListener('change', (e) => {
-        const idx = parseInt(e.target.value, 10) || 0;
-        stopProcessTimer();
-        appState.currentPageIdx = idx;
-        appState.currentProcessStep = 0;
-        triggerPageFlipAnimation();
-        renderBookSpreadView();
-      });
-    }
-
-    // 왼쪽 페이지 계층 배지 클릭
+    // 계층 배지 클릭
     const layerBtn = document.getElementById('leftPageLayerBtn');
     if (layerBtn) {
       layerBtn.addEventListener('click', () => {
@@ -2092,7 +2038,7 @@
       appState.bookmarkedIds[cur.id] = !appState.bookmarkedIds[cur.id];
       saveProgressState();
       renderBookSpreadView();
-      showToast(appState.bookmarkedIds[cur.id] ? '이 페이지에 책갈피를 추가했습니다.' : '책갈피를 해제했습니다.');
+      showToast(appState.bookmarkedIds[cur.id] ? '이 단원에 책갈피를 추가했습니다.' : '책갈피를 해제했습니다.');
     });
 
     document.getElementById('btnToggleLearned').addEventListener('click', () => {
@@ -2104,14 +2050,17 @@
       showToast(appState.learnedIds[cur.id] ? '이 단원을 완독 표시했습니다.' : '완독 표시를 해제했습니다.');
     });
 
-    // 이전/다음 페이지 이동 함수 (데스크톱 & 모바일 하단바 공용)
+    // 이전/다음 단원 이동 함수
     function goPrevPage() {
+      stopProcessTimer();
       if (appState.currentPageIdx > 0) {
-        stopProcessTimer();
         appState.currentPageIdx--;
         appState.currentProcessStep = 0;
         triggerPageFlipAnimation();
         renderBookSpreadView();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        switchMainView('toc');
       }
     }
     function goNextPage() {
@@ -2121,6 +2070,7 @@
         appState.currentProcessStep = 0;
         triggerPageFlipAnimation();
         renderBookSpreadView();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         switchMainView('toc');
       }
@@ -2142,29 +2092,13 @@
     });
     if (mobToc) mobToc.addEventListener('click', () => switchMainView('toc'));
 
-    // 키보드 좌우 화살표 책장 넘김
+    // 키보드 좌우 화살표 이동
     window.addEventListener('keydown', (e) => {
       if (appState.currentView !== 'ebook') return;
       const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
       if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return;
       if (e.key === 'ArrowRight') goNextPage();
       else if (e.key === 'ArrowLeft') goPrevPage();
-    });
-
-    // 오른쪽 페이지 3가지 모드 전환 (단계별 애니메이션 / 코딩 실습 / 문제 풀이)
-    document.getElementById('btnLabModeVisual').addEventListener('click', () => {
-      appState.rightLabMode = 'visual';
-      renderRightLabPage(appState.terms[appState.currentPageIdx]);
-    });
-    document.getElementById('btnLabModeCode').addEventListener('click', () => {
-      stopProcessTimer();
-      appState.rightLabMode = 'code';
-      renderRightLabPage(appState.terms[appState.currentPageIdx]);
-    });
-    document.getElementById('btnLabModeQuiz').addEventListener('click', () => {
-      stopProcessTimer();
-      appState.rightLabMode = 'quiz';
-      renderRightLabPage(appState.terms[appState.currentPageIdx]);
     });
 
     // 시각 과정 자동 재생 및 다음 단계
@@ -2176,15 +2110,13 @@
         renderRightLabPage(cur);
         return;
       }
-      document.getElementById('btnPlayProcess').textContent = '일시정지';
+      document.getElementById('btnPlayProcess').textContent = '자동 재생 정지';
       appState.processInterval = setInterval(() => {
         const item = appState.terms[appState.currentPageIdx];
         const maxSteps = (item.processSteps || []).length || 4;
         appState.currentProcessStep = (appState.currentProcessStep + 1) % maxSteps;
-        const leftDiag = document.getElementById('leftPageConceptDiagramBox');
-        if (leftDiag) leftDiag.innerHTML = buildConceptAnimatedSvg(item, appState.currentProcessStep);
         renderRightLabPage(item);
-        document.getElementById('btnPlayProcess').textContent = '일시정지';
+        document.getElementById('btnPlayProcess').textContent = '자동 재생 정지';
       }, 2200);
     });
 
@@ -2193,8 +2125,6 @@
       const cur = appState.terms[appState.currentPageIdx];
       const maxSteps = (cur.processSteps || []).length || 4;
       appState.currentProcessStep = (appState.currentProcessStep + 1) % maxSteps;
-      const leftDiag = document.getElementById('leftPageConceptDiagramBox');
-      if (leftDiag) leftDiag.innerHTML = buildConceptAnimatedSvg(cur, appState.currentProcessStep);
       renderRightLabPage(cur);
     });
 
@@ -2286,11 +2216,17 @@
     const inputPosEl = document.getElementById('inputInsertPosition');
     const inputSecCodeEl = document.getElementById('inputSectionCode');
 
-    document.getElementById('btnOpenAddModal').addEventListener('click', () => {
+    function openAddModal() {
+      closeMobileSidebar();
       inputChEl.value = String(appState.selectedChapter || 3);
       populateAddModalPositionSelect();
       modalAdd.classList.remove('hidden');
-    });
+    }
+
+    document.getElementById('btnOpenAddModal').addEventListener('click', openAddModal);
+    const mobQuickAdd = document.getElementById('btnMobileQuickAdd');
+    if (mobQuickAdd) mobQuickAdd.addEventListener('click', openAddModal);
+
     document.getElementById('btnCloseAddModal').addEventListener('click', () => modalAdd.classList.add('hidden'));
     document.getElementById('btnCancelAdd').addEventListener('click', () => modalAdd.classList.add('hidden'));
 
@@ -2397,6 +2333,7 @@
     }
 
     document.getElementById('btnOpenExportModal').addEventListener('click', () => {
+      closeMobileSidebar();
       refreshExportArea();
       modalExport.classList.remove('hidden');
     });
