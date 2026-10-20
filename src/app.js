@@ -9,7 +9,6 @@
   'use strict';
 
   const STORAGE_KEYS = {
-    CUSTOM_TERMS: 'ai_ebook_custom_terms_v3',
     LEARNED: 'ai_ebook_learned_v3',
     BOOKMARKS: 'ai_ebook_bookmarks_v3',
     QUIZ_PASSED: 'ai_ebook_quiz_passed_v3',
@@ -33,7 +32,7 @@
     indexFilterPart: 'all',
     tocFilterDiff: 'all',
     searchQuery: '',
-    exportMode: 'gitcode',       // 'gitcode' | 'markdown' | 'backup'
+    exportMode: 'markdown',      // 'markdown' | 'backup'
     terms: [],
     learnedIds: {},
     bookmarkedIds: {},
@@ -42,7 +41,8 @@
   };
 
   // --------------------------------------------------------------------------
-  // 1. 스마트 목차 번호(sectionCode) 비교 및 자동 정렬 엔진
+  // 1. 코드 기반 목차 번호(sectionCode) 비교 및 자동 정렬 엔진
+  //    (src/data/parts/*.js 에 새 단원을 코드로 추가하면 sectionCode 순서대로 자동 정렬됨)
   // --------------------------------------------------------------------------
   function parseSectionParts(codeStr, fallbackChapter) {
     if (!codeStr || typeof codeStr !== 'string') {
@@ -89,54 +89,20 @@
     return first === last ? `p. ${first}` : `p. ${first} — p. ${last}`;
   }
 
-  function suggestNextSectionCode(chapterId, afterTermId) {
-    const chTerms = appState.terms.filter(t => Number(t.chapter) === Number(chapterId));
-    if (chTerms.length === 0) return `${chapterId}.1`;
-
-    if (!afterTermId || afterTermId === '__END__') {
-      const lastTerm = chTerms[chTerms.length - 1];
-      const parts = parseSectionParts(lastTerm.sectionCode, chapterId);
-      if (parts.length >= 2) {
-        return `${parts[0]}.${parts[1] + 1}`;
-      }
-      return `${chapterId}.${chTerms.length + 1}`;
-    }
-
-    if (afterTermId === '__START__') {
-      return `${chapterId}.0.1`;
-    }
-
-    const idx = chTerms.findIndex(t => t.id === afterTermId);
-    if (idx === -1) return `${chapterId}.${chTerms.length + 1}`;
-
-    const target = chTerms[idx];
-    const baseCode = target.sectionCode || `${chapterId}.${idx + 1}`;
-    let subIdx = 1;
-    while (chTerms.some(t => t.sectionCode === `${baseCode}.${subIdx}`)) {
-      subIdx++;
-    }
-    return `${baseCode}.${subIdx}`;
-  }
-
   // --------------------------------------------------------------------------
-  // 2. 로컬 스토리지 상태 로드 및 저장
+  // 2. 로컬 스토리지 상태 로드 및 저장 (독서 진도 · 책갈피 · 개인 메모)
   // --------------------------------------------------------------------------
   function loadSavedState() {
     const initialList = Array.isArray(window.BOOK_PARTS_DATA) ? [...window.BOOK_PARTS_DATA] : [];
+    appState.terms = [...initialList];
+    sortAllTerms();
+
     try {
-      const savedCustom = localStorage.getItem(STORAGE_KEYS.CUSTOM_TERMS);
       const savedLearned = localStorage.getItem(STORAGE_KEYS.LEARNED);
       const savedBookmarks = localStorage.getItem(STORAGE_KEYS.BOOKMARKS);
       const savedQuiz = localStorage.getItem(STORAGE_KEYS.QUIZ_PASSED);
       const savedNotes = localStorage.getItem(STORAGE_KEYS.USER_NOTES);
       const savedCover = localStorage.getItem(STORAGE_KEYS.COVER_IDX);
-
-      const customTerms = savedCustom ? JSON.parse(savedCustom) : [];
-      const existingIds = new Set(initialList.map(t => t.id));
-      const validCustom = customTerms.filter(t => t && t.id && !existingIds.has(t.id));
-
-      appState.terms = [...initialList, ...validCustom];
-      sortAllTerms();
 
       appState.learnedIds = savedLearned ? JSON.parse(savedLearned) : {};
       appState.bookmarkedIds = savedBookmarks ? JSON.parse(savedBookmarks) : {};
@@ -146,8 +112,7 @@
         appState.selectedCoverIdx = parseInt(savedCover, 10) || 0;
       }
     } catch (e) {
-      appState.terms = [...initialList];
-      sortAllTerms();
+      // Ignore storage read errors
     }
   }
 
@@ -158,8 +123,6 @@
       localStorage.setItem(STORAGE_KEYS.QUIZ_PASSED, JSON.stringify(appState.quizPassedIds));
       localStorage.setItem(STORAGE_KEYS.USER_NOTES, JSON.stringify(appState.userNotes));
       localStorage.setItem(STORAGE_KEYS.COVER_IDX, String(appState.selectedCoverIdx));
-      const customTerms = appState.terms.filter(t => t.isCustom);
-      localStorage.setItem(STORAGE_KEYS.CUSTOM_TERMS, JSON.stringify(customTerms));
     } catch (e) {
       // Ignore quota errors
     }
@@ -973,7 +936,6 @@
             ${isLearned ? '<span class="text-xs px-2 py-0.5 rounded bg-stone-800 text-stone-100 shrink-0">완독</span>' : ''}
             ${isQuizPassed ? '<span class="text-xs px-2 py-0.5 rounded bg-emerald-800 text-stone-100 shrink-0">퀴즈통과</span>' : ''}
             ${isBookmarked ? '<span class="text-xs px-2 py-0.5 rounded bg-amber-200 text-amber-950 shrink-0">책갈피</span>' : ''}
-            ${item.isCustom ? '<span class="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-900 border border-indigo-300 shrink-0">신규수록</span>' : ''}
           </div>
           <div class="flex-1 border-b border-dotted border-stone-400 mx-2 min-w-[20px]"></div>
           <span class="text-xs sm:text-sm font-serif-book font-bold text-stone-700 shrink-0">p. ${pageNumStr}</span>
@@ -1830,70 +1792,13 @@
   }
 
   // --------------------------------------------------------------------------
-  // 15. 스마트 목차 끼워넣기 모달 & Git 원고 내보내기 빌더
+  // 15. 전체 마크다운 원고 및 학습 노트 백업 빌더
   // --------------------------------------------------------------------------
-  function populateAddModalPositionSelect() {
-    const chVal = parseInt(document.getElementById('inputChapter').value, 10) || 3;
-    const posSelect = document.getElementById('inputInsertPosition');
-    const codeInput = document.getElementById('inputSectionCode');
-    if (!posSelect || !codeInput) return;
-
-    const chTerms = appState.terms.filter(t => Number(t.chapter) === chVal);
-    posSelect.innerHTML = '';
-
-    const optEnd = document.createElement('option');
-    optEnd.value = '__END__';
-    optEnd.textContent = `Part ${chVal}의 맨 마지막 단원으로 추가 (권장)`;
-    posSelect.appendChild(optEnd);
-
-    chTerms.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t.id;
-      opt.textContent = `[${t.sectionCode}] ${t.term.slice(0, 28)} 바로 뒤에 끼워넣기`;
-      posSelect.appendChild(opt);
-    });
-
-    const optStart = document.createElement('option');
-    optStart.value = '__START__';
-    optStart.textContent = `Part ${chVal}의 맨 앞(도입부)에 끼워넣기`;
-    posSelect.appendChild(optStart);
-
-    codeInput.value = suggestNextSectionCode(chVal, '__END__');
-  }
-
   function buildExportContent() {
-    if (appState.exportMode === 'gitcode') {
-      const customList = appState.terms.filter(t => t.isCustom);
-      const targetList = customList.length > 0 ? customList : [appState.terms[appState.currentPageIdx]];
-      const lines = [
-        '// ============================================================================',
-        '// [AI-Book: Learning Log — Git 업데이트 코드]',
-        '// 아래 코드를 복사하여 해당 Part 데이터 파일에 붙여넣으세요:',
-        '// - Part 1: src/data/parts/part1-foundations.js',
-        '// - Part 2: src/data/parts/part2-ml-dl-rl.js',
-        '// - Part 3 (온톨로지/지식그래프): src/data/parts/part3-ontology-knowledge.js',
-        '// - Part 4: src/data/parts/part4-llm-architecture.js',
-        '// - Part 5: src/data/parts/part5-agents.js',
-        '// - Part 6: src/data/parts/part6-mlops-serving.js',
-        '// ============================================================================',
-        '',
-        'window.BOOK_PARTS_DATA.push('
-      ];
-      targetList.forEach((item, idx) => {
-        const cleanCopy = Object.assign({}, item);
-        delete cleanCopy.isCustom;
-        const jsonStr = JSON.stringify(cleanCopy, null, 2);
-        lines.push(jsonStr + (idx < targetList.length - 1 ? ',' : ''));
-      });
-      lines.push(');');
-      return lines.join('\n');
-    }
-
     if (appState.exportMode === 'backup') {
       return JSON.stringify({
         project: 'AI-Book: Learning Log',
         exportedAt: new Date().toISOString(),
-        customTerms: appState.terms.filter(t => t.isCustom),
         learnedIds: appState.learnedIds,
         bookmarkedIds: appState.bookmarkedIds,
         quizPassedIds: appState.quizPassedIds,
@@ -2209,117 +2114,7 @@
     });
 
     // ------------------------------------------------------------------------
-    // 모달 1: 목차 순서에 맞게 새 단원 끼워넣기
-    // ------------------------------------------------------------------------
-    const modalAdd = document.getElementById('modalAdd');
-    const inputChEl = document.getElementById('inputChapter');
-    const inputPosEl = document.getElementById('inputInsertPosition');
-    const inputSecCodeEl = document.getElementById('inputSectionCode');
-
-    function openAddModal() {
-      closeMobileSidebar();
-      inputChEl.value = String(appState.selectedChapter || 3);
-      populateAddModalPositionSelect();
-      modalAdd.classList.remove('hidden');
-    }
-
-    document.getElementById('btnOpenAddModal').addEventListener('click', openAddModal);
-    const mobQuickAdd = document.getElementById('btnMobileQuickAdd');
-    if (mobQuickAdd) mobQuickAdd.addEventListener('click', openAddModal);
-
-    document.getElementById('btnCloseAddModal').addEventListener('click', () => modalAdd.classList.add('hidden'));
-    document.getElementById('btnCancelAdd').addEventListener('click', () => modalAdd.classList.add('hidden'));
-
-    inputChEl.addEventListener('change', () => {
-      populateAddModalPositionSelect();
-    });
-    inputPosEl.addEventListener('change', () => {
-      const chVal = parseInt(inputChEl.value, 10) || 3;
-      inputSecCodeEl.value = suggestNextSectionCode(chVal, inputPosEl.value);
-    });
-
-    document.getElementById('formAddItem').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const ch = parseInt(inputChEl.value, 10) || 3;
-      const sectionCode = (inputSecCodeEl.value || `${ch}.9`).trim();
-      const difficulty = document.getElementById('inputDifficulty').value || 'intermediate';
-      const layer = document.getElementById('inputLayer').value || 'L3';
-      const term = document.getElementById('inputTermName').value.trim();
-      const analogy = document.getElementById('inputAnalogy').value.trim();
-      const definition = document.getElementById('inputDefinition').value.trim();
-      const studyGuide = document.getElementById('inputStudyGuide').value.trim();
-      const keyTermsRaw = document.getElementById('inputKeyTerms').value.trim();
-      const toolsRaw = document.getElementById('inputRelatedTools').value.trim();
-      const quizQ = document.getElementById('inputQuizQuestion').value.trim();
-      const quizAns = document.getElementById('inputQuizAnswer').value.trim();
-
-      if (!term || !analogy || !definition) return;
-
-      const selectedRoles = [];
-      document.querySelectorAll('.input-role-checkbox:checked').forEach(cb => {
-        selectedRoles.push(cb.value);
-      });
-
-      const parsedKeyTerms = keyTermsRaw
-        ? keyTermsRaw.split('\n').map(line => {
-            const parts = line.split(':');
-            if (parts.length >= 2) {
-              return { term: parts[0].trim(), desc: parts.slice(1).join(':').trim() };
-            }
-            return { term: line.trim(), desc: '핵심 연관 용어' };
-          }).filter(k => k.term)
-        : [];
-
-      const relatedTools = toolsRaw
-        ? toolsRaw.split(',').map(s => s.trim()).filter(Boolean)
-        : ['Custom Study Note'];
-
-      const newItem = {
-        id: 'custom_' + Date.now(),
-        chapter: ch,
-        sectionCode: sectionCode,
-        layer: layer,
-        difficulty: difficulty,
-        roles: selectedRoles.length > 0 ? selectedRoles : ['pm', 'app-be', 'data-ontology'],
-        term: term,
-        analogy: analogy,
-        definition: definition,
-        deepNote: studyGuide ? `공부 및 실무 포인트: ${studyGuide}` : undefined,
-        studyGuide: studyGuide || undefined,
-        keyTerms: parsedKeyTerms,
-        relatedTools: relatedTools,
-        dateAdded: new Date().toISOString().slice(0, 10),
-        isCustom: true
-      };
-
-      if (quizQ && quizAns) {
-        newItem.quiz = {
-          question: quizQ,
-          options: [
-            quizAns,
-            '모델의 파라미터를 무작위로 초기화하여 삭제하는 작업이다.',
-            '하드웨어 냉각 팬의 회전 속도를 수동으로 고정하는 방식이다.',
-            '네트워크 연결을 영구적으로 차단하는 물리적 스위치이다.'
-          ],
-          answerIndex: 0,
-          explanation: `핵심 정답: ${quizAns} (${analogy})`
-        };
-      }
-
-      appState.terms.push(newItem);
-      sortAllTerms();
-      saveProgressState();
-
-      const insertedIdx = appState.terms.findIndex(t => t.id === newItem.id);
-      document.getElementById('formAddItem').reset();
-      modalAdd.classList.add('hidden');
-      renderTocView();
-      openBookAtPage(insertedIdx >= 0 ? insertedIdx : appState.terms.length - 1);
-      showToast(`[${sectionCode}] 단원이 목차 순서에 맞춰 p.${String(insertedIdx + 1).padStart(2, '0')}에 끼워 넣어졌습니다.`);
-    });
-
-    // ------------------------------------------------------------------------
-    // 모달 2: 원고 내보내기 & Git 업데이트 코드 생성
+    // 모달: 전체 마크다운 원고 & 내 학습 노트 백업
     // ------------------------------------------------------------------------
     const modalExport = document.getElementById('modalExport');
     function refreshExportArea() {
@@ -2342,19 +2137,19 @@
 
     document.querySelectorAll('.export-mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        appState.exportMode = btn.getAttribute('data-exportmode') || 'gitcode';
+        appState.exportMode = btn.getAttribute('data-exportmode') || 'markdown';
         refreshExportArea();
       });
     });
 
     document.getElementById('btnCopyMarkdown').addEventListener('click', () => {
       const content = document.getElementById('exportMarkdownArea').value;
-      copyTextSafe(content, '원고 코드가 클립보드에 복사되었습니다.');
+      copyTextSafe(content, '원고가 클립보드에 복사되었습니다.');
     });
 
     document.getElementById('btnDownloadExportFile').addEventListener('click', () => {
       const content = document.getElementById('exportMarkdownArea').value;
-      const ext = appState.exportMode === 'gitcode' ? 'js' : (appState.exportMode === 'backup' ? 'json' : 'md');
+      const ext = appState.exportMode === 'backup' ? 'json' : 'md';
       const filename = `ai-book-learning-log-${new Date().toISOString().slice(0, 10)}.${ext}`;
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
